@@ -81,6 +81,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "https://*.vercel.app",   # Vercel Production
+        "https://*.onrender.com",  # Render Production
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -103,6 +104,11 @@ async def root():
         "docs": "/docs",
         "health": "/api/health"
     }
+
+@app.get("/health", tags=["Health"])
+async def health():
+    """Simple health check for Render"""
+    return {"status": "ok"}
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():
