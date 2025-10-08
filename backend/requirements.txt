@@ -1,0 +1,82 @@
+# ============================================
+# GedaechtnisBoost Premium - Backend Dependencies
+# Production-Ready FastAPI Application
+# Last Updated: 2025-10-06
+# ============================================
+
+# ============================================
+# FastAPI Framework
+# ============================================
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# ============================================
+# Database (SQLAlchemy + PostgreSQL)
+# ============================================
+sqlalchemy==2.0.25
+alembic==1.13.1
+
+# PostgreSQL Driver (for Neon & Production)
+psycopg2-binary==2.9.9
+
+# ============================================
+# Data Validation & Settings
+# ============================================
+# FIXED: Using pydantic[email] instead of pydantic
+# This includes email-validator for EmailStr validation
+pydantic[email]==2.5.3
+pydantic-settings==2.1.0
+
+# ============================================
+# Security & Authentication
+# ============================================
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+# IMPORTANT: bcrypt 4.0.1 is used for compatibility with passlib 1.7.4
+# bcrypt 4.1.0+ has internal structure changes that cause warnings
+# This is a known issue - stick with 4.0.1 until passlib updates
+bcrypt==4.0.1
+
+# ============================================
+# HTTP Client
+# ============================================
+httpx==0.26.0
+
+# ============================================
+# Trending Topics & Data Analysis
+# ============================================
+pytrends==4.9.2
+
+# ============================================
+# Environment Variables
+# ============================================
+python-dotenv==1.0.0
+
+# ============================================
+# Development Tools
+# ============================================
+pytest==7.4.4
+pytest-asyncio==0.23.3
+black==24.1.1
+
+# ============================================
+# Additional Production Dependencies
+# ============================================
+# For better logging and monitoring (optional but recommended)
+# python-json-logger==2.0.7
+
+# For API documentation enhancements (optional)
+# markdown==3.5.2
+
+# For request rate limiting (optional but recommended for production)
+# slowapi==0.1.9
+
+# ============================================
+# NOTES:
+# - All versions are pinned for reproducibility
+# - pydantic[email] includes email-validator automatically
+# - uvicorn[standard] includes all performance dependencies
+# - python-jose[cryptography] includes cryptography for JWT
+# - passlib[bcrypt] includes bcrypt for password hashing
+# ============================================
