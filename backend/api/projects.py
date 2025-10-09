@@ -15,7 +15,7 @@ from datetime import datetime
 from enum import Enum
 import uuid
 
-from core.security import get_current_user_data
+from core.security import get_current_user_data, get_optional_user_data
 
 router = APIRouter()
 
@@ -277,10 +277,16 @@ def generate_recommendations(project: ProjectMetadata) -> List[ProjectRecommenda
 # ============================================
 
 @router.get("/projects", response_model=List[ProjectListItem])
-async def list_projects(user_data: dict = Depends(get_current_user_data)):
+async def list_projects(user_data: Optional[dict] = Depends(get_optional_user_data)):
     """
-    List all projects for current user
+    List all projects (works WITHOUT login)
+    - WITH login: Returns user's projects
+    - WITHOUT login: Returns empty list
     """
+    # No login - return empty list
+    if user_data is None:
+        return []
+
     user_id = user_data.get('username')
 
     if user_id not in USER_PROJECTS:
@@ -304,11 +310,16 @@ async def list_projects(user_data: dict = Depends(get_current_user_data)):
 @router.get("/projects/{project_id}", response_model=ProjectMetadata)
 async def get_project(
     project_id: str,
-    user_data: dict = Depends(get_current_user_data)
+    user_data: Optional[dict] = Depends(get_optional_user_data)
 ):
     """
-    Get project by ID
+    Get project by ID (works WITHOUT login)
+    - WITHOUT login: Returns 404
     """
+    # No login - return 404
+    if user_data is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
     user_id = user_data.get('username')
 
     if user_id not in USER_PROJECTS:

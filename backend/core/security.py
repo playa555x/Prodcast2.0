@@ -210,16 +210,56 @@ def require_role(*allowed_roles: str):
     return role_checker
 
 # ============================================
+# Optional Authentication (No Login Required)
+# ============================================
+
+async def get_optional_user_data(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
+) -> Optional[Dict[str, Any]]:
+    """
+    Get user data if authenticated, None if not
+
+    This allows endpoints to work WITHOUT login, but provide
+    enhanced features when user IS logged in.
+
+    Usage:
+        @app.get("/projects")
+        def list_projects(user_data: Optional[Dict] = Depends(get_optional_user_data)):
+            if user_data:
+                # User is logged in - return their projects
+                user_id = user_data.get('username')
+                return user_projects[user_id]
+            else:
+                # No login - return demo/public projects
+                return demo_projects
+
+    Args:
+        credentials: HTTP Bearer credentials (optional)
+
+    Returns:
+        User data dict if authenticated, None otherwise
+    """
+    if credentials is None:
+        return None
+
+    try:
+        token = credentials.credentials
+        return decode_access_token(token)
+    except HTTPException:
+        # Invalid token - treat as no auth
+        return None
+
+# ============================================
 # Utility Functions
 # ============================================
 
 def create_user_token_data(user) -> Dict[str, Any]:
     """
     Create token data from user object
-    
+
     Args:
         user: User object from database
-        
+
     Returns:
         Dictionary with user data for JWT token
     """
