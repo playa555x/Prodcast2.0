@@ -2,8 +2,9 @@
 GedächtnisBoost Premium TTS Platform
 FastAPI Backend - Main Application
 
-Version: 2.0.0
+Version: 2.0.1
 Quality: 12/10 - Production Ready
+TTS & Trending APIs Active
 """
 
 from fastapi import FastAPI, HTTPException, Depends
