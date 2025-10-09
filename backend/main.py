@@ -113,31 +113,34 @@ async def health_check():
     }
 
 # ============================================
-# API Routes (Temporarily disabled for testing)
+# API Routes
 # ============================================
 
-# TODO: Re-enable routers after fixing deployment
+# Database-free routers (no DB dependency)
+from api.tts import router as tts_router
+from api.trending import router as trending_router
+
+app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
+app.include_router(trending_router, prefix="/api", tags=["Trending Topics"])
+
+# Database-dependent routers (disabled until PostgreSQL configured)
 # from api.auth import router as auth_router
-# from api.tts import router as tts_router
-# from api.podcast import router as podcast_router
-# from api.research import router as research_router
-# from api.production import router as production_router
 # from api.users import router as users_router
-# from api.voice_library import router as voice_library_router
-# from api.ai_studio import router as ai_studio_router
-# from api.claude_script import router as claude_script_router
 # from api.projects import router as projects_router
 # from api.admin import router as admin_router
 # from api.account import router as account_router
-# from api.trending import router as trending_router
+# from api.podcast import router as podcast_router
+# from api.research import router as research_router
+# from api.production import router as production_router
+# from api.ai_studio import router as ai_studio_router
+# from api.claude_script import router as claude_script_router
+# from api.voice_library import router as voice_library_router
 
 # app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 # app.include_router(users_router, prefix="/api/users", tags=["Users"])
 # app.include_router(projects_router, prefix="/api", tags=["Projects"])
 # app.include_router(admin_router, prefix="/api", tags=["Admin"])
 # app.include_router(account_router, prefix="/api", tags=["Account"])
-# app.include_router(trending_router, prefix="/api", tags=["Trending Topics"])
-# app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
 # app.include_router(podcast_router, prefix="/api/podcast", tags=["Podcast"])
 # app.include_router(research_router, prefix="/api/research", tags=["AI Research"])
 # app.include_router(production_router, prefix="/api/production", tags=["Production Pipeline"])
