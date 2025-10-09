@@ -80,7 +80,7 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
-        "https://*.vercel.app",   # Vercel Production
+        "https://ubiquitous-sprite-b204a9.netlify.app",  # Netlify Production
     ],
     allow_credentials=True,
     allow_methods=["*"],
