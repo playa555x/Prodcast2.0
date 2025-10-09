@@ -47,6 +47,8 @@ httpx==0.26.0
 # Trending Topics & Data Analysis
 # ============================================
 pytrends==4.9.2
+beautifulsoup4==4.12.2
+lxml==5.1.0
 
 # ============================================
 # TTS Services
