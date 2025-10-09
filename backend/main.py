@@ -72,17 +72,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js Dev (default)
-        "http://localhost:3001",  # Next.js alternative port
-        "http://localhost:3002",
-        "http://localhost:4200",  # Angular dev
-        "http://localhost:5173",  # Vite dev
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "https://*.vercel.app",   # Vercel Production
-        "https://*.onrender.com",  # Render Production
-    ],
+    allow_origins=["*"],  # Allow all origins for development/production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
