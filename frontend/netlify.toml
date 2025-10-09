@@ -3,7 +3,7 @@
   publish = ".next"
 
 [build.environment]
-  NEXT_PUBLIC_API_URL = "https://prodcast2-0-3.onrender.com"
+  NEXT_PUBLIC_API_URL = "https://prodcast-backend.onrender.com"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
