@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LoadingSpinner, ProjectSelector, TutorialOverlay, DashboardNavbar } from '@/components'
+import { LoadingSpinner, TutorialOverlay, DashboardNavbar } from '@/components'
 import { HeroBanner, FeatureCard } from '@/components/dashboard'
 import { useAuth } from '@/hooks'
 import { ROUTES } from '@/lib/constants'
