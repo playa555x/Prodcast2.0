@@ -21,7 +21,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Textarea, Card, ErrorAlert, SuccessAlert, VoiceSelector, DashboardNavbar } from '@/components'
+import { Button, Textarea, ErrorAlert, SuccessAlert, VoiceSelector, DashboardNavbar } from '@/components'
 import { ttsService } from '@/lib/tts.service'
 import { claudeScriptService } from '@/lib/claude-script.service'
 import { TTSProvider, VoiceInfo } from '@/types'
@@ -90,11 +90,11 @@ export default function UnifiedTTSPage() {
   const router = useRouter()
 
   // TTS Provider Context
-  const { providers, availableProviders, loading: providersLoading, error: providerError, isProviderAvailable, getVoicesForProvider: getProviderVoices } = useTTSProvider()
+  const { providers, availableProviders, loading: providersLoading, error: providerError } = useTTSProvider()
 
   // Generation Mode State
   const [generationMode, setGenerationMode] = useState<GenerationMode>('pure_api')
-  const [showModeSelector, setShowModeSelector] = useState(false)
+  const [showModeSelector, _setShowModeSelector] = useState(false)
 
   // Speakers State
   const [speakers, setSpeakers] = useState<Speaker[]>([
@@ -115,10 +115,10 @@ export default function UnifiedTTSPage() {
   const [parsingClaudeScript, setParsingClaudeScript] = useState(false)
 
   // Prompt Generation
-  const [promptInput, setPromptInput] = useState('')
-  const [promptSpeakerCount, setPromptSpeakerCount] = useState(2)
-  const [promptStyle, setPromptStyle] = useState<'conversational' | 'formal' | 'casual' | 'interview'>('conversational')
-  const [generatingPrompt, setGeneratingPrompt] = useState(false)
+  const [promptInput, _setPromptInput] = useState('')
+  const [_promptSpeakerCount, _setPromptSpeakerCount] = useState(2)
+  const [_promptStyle, _setPromptStyle] = useState<'conversational' | 'formal' | 'casual' | 'interview'>('conversational')
+  const [_generatingPrompt, _setGeneratingPrompt] = useState(false)
 
   // File Upload
   const [uploadingFile, setUploadingFile] = useState(false)
@@ -207,7 +207,8 @@ export default function UnifiedTTSPage() {
       'fr-ca': 'French (Canada)',
       'de-de': 'German (Germany)',
     }
-    return names[lowerCode] || names[lowerCode.split('-')[0]] || code.toUpperCase()
+    const languageCode = lowerCode.split('-')[0]
+    return names[lowerCode] || (languageCode ? names[languageCode] : undefined) || code.toUpperCase()
   }
 
   // Helper: Get language flag
@@ -264,7 +265,8 @@ export default function UnifiedTTSPage() {
       'fr-ca': '🇨🇦',  // French (Canada)
       'de-de': '🇩🇪',  // German (Germany)
     }
-    return flags[lowerCode] || flags[lowerCode.split('-')[0]] || '🌐'
+    const languageCode = lowerCode.split('-')[0]
+    return flags[lowerCode] || (languageCode ? flags[languageCode] : undefined) || '🌐'
   }
 
   // Load favorites from localStorage
@@ -533,13 +535,15 @@ export default function UnifiedTTSPage() {
       let voice = 'alloy'
 
       // Simple mapping (can be enhanced)
-      const voiceTypeLower = voiceType.toLowerCase()
-      if (voiceTypeLower.includes('male') && voiceTypeLower.includes('deep')) {
-        voice = 'onyx'
-      } else if (voiceTypeLower.includes('female')) {
-        voice = 'nova'
-      } else if (voiceTypeLower.includes('neutral')) {
-        voice = 'echo'
+      if (voiceType) {
+        const voiceTypeLower = voiceType.toLowerCase()
+        if (voiceTypeLower.includes('male') && voiceTypeLower.includes('deep')) {
+          voice = 'onyx'
+        } else if (voiceTypeLower.includes('female')) {
+          voice = 'nova'
+        } else if (voiceTypeLower.includes('neutral')) {
+          voice = 'echo'
+        }
       }
 
       parsedSpeakers.push({

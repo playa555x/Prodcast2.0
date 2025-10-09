@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Button, LoadingSpinner } from '@/components'
+import { Button, LoadingSpinner } from '@/components'
 import { useAuth } from '@/hooks'
 
 // ============================================
@@ -68,7 +68,7 @@ interface PodcastIdea {
 
 export default function TrendingTopicsPage() {
   const router = useRouter()
-  const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<'google' | 'news' | 'reddit' | 'podcast'>('google')
 
   const [googleTrends, setGoogleTrends] = useState<GoogleTrend[]>([])

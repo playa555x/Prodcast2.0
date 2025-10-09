@@ -90,7 +90,7 @@ interface MusicAsset {
 interface SFXAsset {
   id: string
   name: string
-  category: 'reaction' | 'human' | 'ambiente' | 'transition'
+  category: 'reaction' | 'human' | 'ambient' | 'transition'
   subcategory: string // 'laugh', 'coffee', 'breath', etc.
   duration: number
   url: string
@@ -228,7 +228,7 @@ const DEMO_SFX_LIBRARY: SFXAsset[] = [
   {
     id: 'sfx-cafe-1',
     name: 'Café Ambience',
-    category: 'ambiente',
+    category: 'ambient',
     subcategory: 'cafe',
     duration: 60,
     url: '/assets/sfx/ambiente-cafe.mp3'
@@ -236,7 +236,7 @@ const DEMO_SFX_LIBRARY: SFXAsset[] = [
   {
     id: 'sfx-office-1',
     name: 'Office Ambience',
-    category: 'ambiente',
+    category: 'ambient',
     subcategory: 'office',
     duration: 60,
     url: '/assets/sfx/ambiente-office.mp3'
@@ -244,7 +244,7 @@ const DEMO_SFX_LIBRARY: SFXAsset[] = [
   {
     id: 'sfx-nature-1',
     name: 'Nature Ambience',
-    category: 'ambiente',
+    category: 'ambient',
     subcategory: 'nature',
     duration: 60,
     url: '/assets/sfx/ambiente-nature.mp3'
@@ -942,12 +942,16 @@ function StudioContent() {
     const segments: AudioSegment[] = []
 
     for (let i = 0; i < loopsNeeded; i++) {
+      const startTime = i * musicAsset.duration
       segments.push({
         segment_id: `seg-bg-${Date.now()}-${i}`,
+        segment_number: i + 1,
+        segment_type: ProductionSegmentType.MUSIC,
         character_name: musicAsset.name,
         text: `Background: ${musicAsset.name} (Loop ${i + 1})`,
-        start_time: i * musicAsset.duration,
+        start_time: startTime,
         duration: musicAsset.duration,
+        end_time: startTime + musicAsset.duration,
         audio_path: musicAsset.url,
         audio_url: musicAsset.url,
         provider: 'openai',
@@ -957,7 +961,8 @@ function StudioContent() {
         volume: 0.2,
         fade_in: i === 0 ? 2.0 : 0.1,
         fade_out: i === loopsNeeded - 1 ? 2.0 : 0.1,
-        loop: false
+        loop: false,
+        status: 'completed'
       })
     }
 
@@ -1049,7 +1054,7 @@ function StudioContent() {
     if (!track) return
 
     const segment = track.segments?.find(s => s.segment_id === segmentId)
-    if (!segment) return
+    if (!segment || !segment.text) return
 
     const text = segment.text.toLowerCase()
 
@@ -1119,6 +1124,8 @@ function StudioContent() {
       for (let i = 0; i < sortedSegments.length - 1; i++) {
         const current = sortedSegments[i]
         const next = sortedSegments[i + 1]
+        if (!current || !next) continue
+
         const pauseStart = current.start_time + current.duration
         const pauseEnd = next.start_time
         const pauseDuration = pauseEnd - pauseStart
@@ -1136,8 +1143,11 @@ function StudioContent() {
     }
 
     // Insert coffee sound at first pause
-    insertSFX(coffeeSfx, pauses[0], 0.35)
-    setSuccess(`✅ Kaffee-Sound bei ${pauses[0].toFixed(1)}s hinzugefügt (${pauses.length} Pausen gefunden)`)
+    const firstPause = pauses[0]
+    if (firstPause !== undefined) {
+      insertSFX(coffeeSfx, firstPause, 0.35)
+      setSuccess(`✅ Kaffee-Sound bei ${firstPause.toFixed(1)}s hinzugefügt (${pauses.length} Pausen gefunden)`)
+    }
   }
 
   /**
@@ -1162,6 +1172,8 @@ function StudioContent() {
         if (index === 0) return // Skip first segment
 
         const prevSegment = sortedSegments[index - 1]
+        if (!prevSegment) return
+
         const pauseDuration = segment.start_time - (prevSegment.start_time + prevSegment.duration)
 
         // Add breath before segment if pause is > 2 seconds
@@ -1211,6 +1223,7 @@ function StudioContent() {
     for (let i = 0; i < allSegments.length - 1; i++) {
       const current = allSegments[i]
       const next = allSegments[i + 1]
+      if (!current || !next) continue
 
       // Skip if same track
       if (current.trackId === next.trackId) continue
@@ -1273,28 +1286,6 @@ function StudioContent() {
   }
 
   /**
-   * Create interruption effect
-   * Cuts off current speaker and starts new one
-   */
-  const createInterruption = (interruptedTrackId: string, interruptedSegmentId: string, interruptAtPercent: number = 0.7) => {
-    const track = tracks.find(t => t.track_id === interruptedTrackId)
-    if (!track) return
-
-    const segment = track.segments?.find(s => s.segment_id === interruptedSegmentId)
-    if (!segment) return
-
-    // Cut segment at interrupt point
-    const interruptTime = segment.start_time + (segment.duration * interruptAtPercent)
-    const newDuration = segment.duration * interruptAtPercent
-
-    updateSegment(interruptedTrackId, interruptedSegmentId, {
-      duration: newDuration
-    })
-
-    setSuccess(`✅ Unterbrechung bei ${interruptTime.toFixed(1)}s erstellt`)
-  }
-
-  /**
    * Optimize timing for more natural dialog flow
    * Reduces gaps between speakers
    */
@@ -1316,6 +1307,7 @@ function StudioContent() {
     for (let i = 0; i < allSegments.length - 1; i++) {
       const current = allSegments[i]
       const next = allSegments[i + 1]
+      if (!current || !next) continue
 
       // Skip if same track (handled differently)
       if (current.trackId === next.trackId) continue
@@ -1364,7 +1356,8 @@ function StudioContent() {
     // Collect all text from segments
     const allText = tracks
       .flatMap(t => t.segments || [])
-      .map(s => s.text.toLowerCase())
+      .filter(s => s.text)
+      .map(s => s.text!.toLowerCase())
       .join(' ')
 
     // Count matches for each theme
@@ -1463,20 +1456,6 @@ function StudioContent() {
     setSuccess(`✅ Ambiente "${sfxAsset.name}" eingefügt (looping)`)
   }
 
-  /**
-   * Remove ambient sounds from timeline
-   */
-  const removeAmbientSounds = () => {
-    const ambientTrack = tracks.find(t => t.track_name.toLowerCase().includes('ambiente') || t.track_name.toLowerCase().includes('ambient'))
-
-    if (ambientTrack) {
-      setTracks(tracks.filter(t => t.track_id !== ambientTrack.track_id))
-      setSuccess('✅ Ambiente entfernt')
-    } else {
-      setError('Keine Ambiente-Sounds gefunden')
-    }
-  }
-
   // ============================================
   // Feature 5: Emotionale Dynamik (Emotional Dynamics)
   // ============================================
@@ -1536,6 +1515,7 @@ function StudioContent() {
     }
 
     const config = emotionConfig[sentiment] || emotionConfig.neutral
+    if (!config) return
 
     updateSegment(trackId, segmentId, {
       speed: config.speed,
@@ -1562,6 +1542,8 @@ function StudioContent() {
       }
 
       track.segments?.forEach(segment => {
+        if (!segment.text) return
+
         const sentiment = analyzeSentiment(segment.text)
 
         if (sentiment !== 'neutral') {
@@ -1576,22 +1558,6 @@ function StudioContent() {
     } else {
       setSuccess('✅ Keine emotionalen Anpassungen nötig')
     }
-  }
-
-  /**
-   * Reset all emotional dynamics to neutral
-   */
-  const resetEmotionalDynamics = () => {
-    tracks.forEach(track => {
-      track.segments?.forEach(segment => {
-        updateSegment(track.track_id, segment.segment_id, {
-          speed: 1.0,
-          pitch: 0
-        })
-      })
-    })
-
-    setSuccess('✅ Emotionale Dynamik zurückgesetzt')
   }
 
   // ============================================
@@ -1781,6 +1747,8 @@ function StudioContent() {
         for (let i = 0; i < sortedSegments.length - 1; i++) {
           const current = sortedSegments[i]
           const next = sortedSegments[i + 1]
+          if (!current || !next) continue
+
           const gapStart = current.start_time + current.duration
           const gapEnd = next.start_time
           const gapDuration = gapEnd - gapStart
@@ -1794,9 +1762,10 @@ function StudioContent() {
 
       if (gaps.length > 0 && musicLibrary.length > 0) {
         const jingle = musicLibrary.find(m => m.type === 'jingle')
-        if (jingle) {
+        const firstGap = gaps[0]
+        if (jingle && firstGap) {
           // Suggest jingle for the longest gap
-          const longestGap = gaps.reduce((max, gap) => gap.duration > max.duration ? gap : max, gaps[0])
+          const longestGap = gaps.reduce((max, gap) => gap.duration > max.duration ? gap : max, firstGap)
           const insertTime = longestGap.start + (longestGap.duration / 2) - (jingle.duration / 2)
 
           suggestions.push({
@@ -1884,6 +1853,8 @@ function StudioContent() {
         for (let i = 0; i < sortedSegments.length - 1; i++) {
           const current = sortedSegments[i]
           const next = sortedSegments[i + 1]
+          if (!current || !next) continue
+
           const pauseStart = current.start_time + current.duration
           const pauseEnd = next.start_time
           const pauseDuration = pauseEnd - pauseStart
@@ -1896,8 +1867,9 @@ function StudioContent() {
 
       if (longPauses.length > 0 && sfxLibrary.length > 0) {
         const coffeeSfx = sfxLibrary.find(s => s.subcategory === 'coffee')
-        if (coffeeSfx) {
-          const longestPause = longPauses.reduce((max, p) => p.duration > max.duration ? p : max, longPauses[0])
+        const firstPause = longPauses[0]
+        if (coffeeSfx && firstPause) {
+          const longestPause = longPauses.reduce((max, p) => p.duration > max.duration ? p : max, firstPause)
 
           suggestions.push({
             id: `sug-coffee-${Date.now()}`,
@@ -1918,6 +1890,7 @@ function StudioContent() {
       const reactionSegments: Array<{ trackId: string; segmentId: string; emotion: string }> = []
       tracks.forEach(track => {
         track.segments?.forEach(seg => {
+          if (!seg.text) return
           const text = seg.text.toLowerCase()
 
           // Check for laugh keywords
@@ -1929,8 +1902,8 @@ function StudioContent() {
 
       if (reactionSegments.length > 0 && sfxLibrary.length > 0) {
         const laughSfx = sfxLibrary.find(s => s.subcategory === 'laugh')
-        if (laughSfx) {
-          const first = reactionSegments[0]
+        const first = reactionSegments[0]
+        if (laughSfx && first) {
           const segment = tracks.find(t => t.track_id === first.trackId)?.segments?.find(s => s.segment_id === first.segmentId)
 
           if (segment) {
@@ -1989,6 +1962,7 @@ function StudioContent() {
       for (let i = 0; i < allDialogSegments.length - 1; i++) {
         const current = allDialogSegments[i]
         const next = allDialogSegments[i + 1]
+        if (!current || !next) continue
 
         if (current.trackId === next.trackId) continue
 
@@ -2070,7 +2044,7 @@ function StudioContent() {
           if (ambientSfx) {
             suggestions.push({
               id: `sug-ambient-${Date.now()}`,
-              type: SuggestionType.AMBIENCE,
+              type: SuggestionType.SFX,
               priority: SuggestionPriority.MEDIUM,
               title: 'Ambiente-Sound hinzufügen',
               description: `Füge "${ambientSfx.name}" Ambiente hinzu (Theme: ${primaryTheme}). Macht Podcast lebendiger!`,
@@ -2087,7 +2061,7 @@ function StudioContent() {
           if (cafeAmbient) {
             suggestions.push({
               id: `sug-ambient-${Date.now()}`,
-              type: SuggestionType.AMBIENCE,
+              type: SuggestionType.SFX,
               priority: SuggestionPriority.LOW,
               title: 'Ambiente-Sound hinzufügen',
               description: `Füge subtile "${cafeAmbient.name}" Ambiente hinzu für mehr Atmosphäre`,
@@ -2116,6 +2090,7 @@ function StudioContent() {
         }
 
         track.segments?.forEach(segment => {
+          if (!segment.text) return
           const sentiment = analyzeSentiment(segment.text)
           if (sentiment !== 'neutral') {
             sentimentSegments.push({
@@ -2139,7 +2114,7 @@ function StudioContent() {
       if (sentimentSegments.length > 0 && hasStandardDynamics) {
         suggestions.push({
           id: `sug-emotional-${Date.now()}`,
-          type: SuggestionType.ENHANCEMENT,
+          type: SuggestionType.EMOTION,
           priority: SuggestionPriority.MEDIUM,
           title: 'Emotionale Dynamik anwenden',
           description: `${sentimentSegments.length} emotionale Segmente gefunden. Passe Tempo/Tonhöhe für mehr Ausdruckskraft an!`,
@@ -2163,7 +2138,7 @@ function StudioContent() {
           const [sentiment, count] = topSentiment
           suggestions.push({
             id: `sug-emotional-detail-${Date.now()}`,
-            type: SuggestionType.ENHANCEMENT,
+            type: SuggestionType.EMOTION,
             priority: SuggestionPriority.LOW,
             title: `${count}x ${sentiment} Segmente erkannt`,
             description: `Hauptemotion: "${sentiment}". Automatische Anpassung macht Podcast lebendiger!`,
@@ -2207,6 +2182,8 @@ function StudioContent() {
 
     matches.forEach((match) => {
       const [, speakerName, voiceType, text] = match
+      if (!speakerName || !voiceType || !text) return
+
       if (!speakerGroups[speakerName]) {
         speakerGroups[speakerName] = []
       }
@@ -2243,7 +2220,8 @@ function StudioContent() {
           fade_in: 0.2,
           fade_out: 0.2,
           status: 'pending',
-          voice: seg.voiceType
+          voice_name: seg.voiceType,
+          provider: 'openai'
         }
 
         currentTime += estimatedDuration + 0.5 // Add small gap between segments
@@ -2320,7 +2298,8 @@ function StudioContent() {
           }
         }
       } else {
-        setError(`❌ ${result.error.detail}`)
+        const errorMsg = 'detail' in result.error ? result.error.detail : (result.error instanceof Error ? result.error.message : String(result.error))
+        setError(`❌ ${errorMsg}`)
       }
     } catch (err) {
       setError(`❌ Generation failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -2353,7 +2332,8 @@ function StudioContent() {
         const speakerCount = parseXMLScriptAndLoadTracks(result.value)
         setSuccess(`✅ File "${file.name}" loaded! ${speakerCount} speaker tracks added to timeline.`)
       } else {
-        setError(`❌ ${result.error.detail}`)
+        const errorMsg = 'detail' in result.error ? result.error.detail : (result.error instanceof Error ? result.error.message : String(result.error))
+        setError(`❌ ${errorMsg}`)
       }
     } catch (err) {
       setError(`❌ File upload failed: ${err instanceof Error ? err.message : String(err)}`)
