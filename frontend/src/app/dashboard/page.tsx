@@ -20,7 +20,7 @@ import { HeroBanner, FeatureCard } from '@/components/dashboard'
 import { useAuth } from '@/hooks'
 import { ROUTES } from '@/lib/constants'
 import type { UserStats } from '@/types'
-import { Moon, Sun, Brain, Mic, Film, TrendingUp, Music, BookOpen, LogOut, User, Users, Settings, Podcast, Clock, FileText, Sparkles } from 'lucide-react'
+import { Brain, Mic, Film, TrendingUp, Music, BookOpen, Podcast, Clock, FileText, Sparkles } from 'lucide-react'
 
 export default function DashboardPage() {
   const router = useRouter()
