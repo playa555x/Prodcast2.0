@@ -24,7 +24,7 @@ import { Brain, Mic, Film, TrendingUp, Music, BookOpen, Podcast, Clock, FileText
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, logout, isAuthenticated, loading: authLoading } = useAuth()
+  const { user, isAuthenticated, loading: authLoading } = useAuth()
   const [expandedStat, setExpandedStat] = useState<string | null>(null)
   const [stats, setStats] = useState<UserStats>({
     userId: '',
