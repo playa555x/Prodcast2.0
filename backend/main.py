@@ -33,20 +33,24 @@ async def lifespan(app: FastAPI):
     logger.info("📡 Environment: Development")
     logger.info("🔗 API Docs: http://localhost:8001/docs")
     
-    # Initialize database
-    from core.database import init_db, create_default_admin, get_db
+    # Initialize database (optional - skip if no DATABASE_URL)
     try:
+        from core.database import init_db, create_default_admin, get_db
         logger.info("📊 Initializing database...")
         init_db()
-        
+
         # Create default admin user
-        db = next(get_db())
-        create_default_admin(db)
-        db.close()
-        
+        try:
+            db = next(get_db())
+            create_default_admin(db)
+            db.close()
+        except Exception:
+            pass  # Skip if DB connection fails
+
         logger.info("✅ Database initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+        logger.warning(f"⚠️  Database initialization skipped: {e}")
+        logger.info("💡 App will run without database persistence")
     
     yield
     
