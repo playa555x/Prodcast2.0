@@ -2,9 +2,8 @@
 GedächtnisBoost Premium TTS Platform
 FastAPI Backend - Main Application
 
-Version: 2.0.2
+Version: 2.0.0
 Quality: 12/10 - Production Ready
-TTS Minimal & Trending APIs Active (No Database Dependencies)
 """
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -33,13 +32,24 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting GedächtnisBoost Premium API...")
     logger.info("📡 Environment: Development")
     logger.info("🔗 API Docs: http://localhost:8001/docs")
-    
-    # Skip database initialization for now - start API only
-    logger.info("⚠️  Database initialization skipped")
-    logger.info("💡 App running in API-only mode")
-    
+
+    # Initialize database
+    from core.database import init_db, create_default_admin, get_db
+    try:
+        logger.info("📊 Initializing database...")
+        init_db()
+
+        # Create default admin user
+        db = next(get_db())
+        create_default_admin(db)
+        db.close()
+
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+
     yield
-    
+
     # Shutdown
     logger.info("👋 Shutting down GedächtnisBoost Premium API...")
 
@@ -62,7 +72,16 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development/production
+    allow_origins=[
+        "http://localhost:3000",  # Next.js Dev (default)
+        "http://localhost:3001",  # Next.js alternative port
+        "http://localhost:3002",
+        "http://localhost:4200",  # Angular dev
+        "http://localhost:5173",  # Vite dev
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "https://*.vercel.app",   # Vercel Production
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,11 +103,6 @@ async def root():
         "docs": "/docs",
         "health": "/api/health"
     }
-
-@app.get("/health", tags=["Health"])
-async def health():
-    """Simple health check for Render"""
-    return {"status": "ok"}
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():
@@ -114,40 +128,36 @@ async def health_check():
     }
 
 # ============================================
-# API Routes
+# API Routes (Import when ready)
 # ============================================
 
-# Database-free routers (no DB dependency)
-from api.tts_minimal import router as tts_router
+from api.auth import router as auth_router
+from api.tts import router as tts_router
+from api.podcast import router as podcast_router
+from api.research import router as research_router
+from api.production import router as production_router
+from api.users import router as users_router
+from api.voice_library import router as voice_library_router
+from api.ai_studio import router as ai_studio_router
+from api.claude_script import router as claude_script_router
+from api.projects import router as projects_router
+from api.admin import router as admin_router
+from api.account import router as account_router
 from api.trending import router as trending_router
 
-app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(projects_router, prefix="/api", tags=["Projects"])
+app.include_router(admin_router, prefix="/api", tags=["Admin"])
+app.include_router(account_router, prefix="/api", tags=["Account"])
 app.include_router(trending_router, prefix="/api", tags=["Trending Topics"])
-
-# Database-dependent routers (disabled until PostgreSQL configured)
-# from api.auth import router as auth_router
-# from api.users import router as users_router
-# from api.projects import router as projects_router
-# from api.admin import router as admin_router
-# from api.account import router as account_router
-# from api.podcast import router as podcast_router
-# from api.research import router as research_router
-# from api.production import router as production_router
-# from api.ai_studio import router as ai_studio_router
-# from api.claude_script import router as claude_script_router
-# from api.voice_library import router as voice_library_router
-
-# app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-# app.include_router(users_router, prefix="/api/users", tags=["Users"])
-# app.include_router(projects_router, prefix="/api", tags=["Projects"])
-# app.include_router(admin_router, prefix="/api", tags=["Admin"])
-# app.include_router(account_router, prefix="/api", tags=["Account"])
-# app.include_router(podcast_router, prefix="/api/podcast", tags=["Podcast"])
-# app.include_router(research_router, prefix="/api/research", tags=["AI Research"])
-# app.include_router(production_router, prefix="/api/production", tags=["Production Pipeline"])
-# app.include_router(ai_studio_router, prefix="/api/ai-studio", tags=["AI Studio"])
-# app.include_router(claude_script_router, prefix="/api/claude-script", tags=["Claude Script Generation"])
-# app.include_router(voice_library_router, prefix="/api", tags=["Voice Library"])
+app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
+app.include_router(podcast_router, prefix="/api/podcast", tags=["Podcast"])
+app.include_router(research_router, prefix="/api/research", tags=["AI Research"])
+app.include_router(production_router, prefix="/api/production", tags=["Production Pipeline"])
+app.include_router(ai_studio_router, prefix="/api/ai-studio", tags=["AI Studio"])
+app.include_router(claude_script_router, prefix="/api/claude-script", tags=["Claude Script Generation"])
+app.include_router(users_router)
+app.include_router(voice_library_router)
 
 # ============================================
 # Error Handlers
@@ -193,4 +203,3 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
- 
