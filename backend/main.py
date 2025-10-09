@@ -2,9 +2,9 @@
 GedächtnisBoost Premium TTS Platform
 FastAPI Backend - Main Application
 
-Version: 2.0.1
+Version: 2.0.2
 Quality: 12/10 - Production Ready
-TTS & Trending APIs Active
+TTS Minimal & Trending APIs Active (No Database Dependencies)
 """
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -118,7 +118,7 @@ async def health_check():
 # ============================================
 
 # Database-free routers (no DB dependency)
-from api.tts import router as tts_router
+from api.tts_minimal import router as tts_router
 from api.trending import router as trending_router
 
 app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
