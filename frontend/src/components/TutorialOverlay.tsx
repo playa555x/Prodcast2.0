@@ -88,6 +88,8 @@ export function TutorialOverlay() {
     if (!isVisible) return
 
     const step = TUTORIAL_STEPS[currentStep]
+    if (!step) return
+
     if (step.target) {
       const element = document.querySelector(`[data-tutorial="${step.target}"]`)
       if (element) {
@@ -104,7 +106,7 @@ export function TutorialOverlay() {
     if (!isVisible) return
 
     const step = TUTORIAL_STEPS[currentStep]
-    if (!step.target) return
+    if (!step || !step.target) return
 
     const handleClick = (e: MouseEvent) => {
       const element = document.querySelector(`[data-tutorial="${step.target}"]`)
@@ -182,6 +184,7 @@ export function TutorialOverlay() {
   if (!isVisible) return null
 
   const step = TUTORIAL_STEPS[currentStep]
+  if (!step) return null
 
   const getCardPosition = () => {
     if (!targetRect || step.position === 'center') {

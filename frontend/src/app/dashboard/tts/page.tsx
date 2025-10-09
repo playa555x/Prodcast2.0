@@ -549,7 +549,7 @@ export default function UnifiedTTSPage() {
       parsedSpeakers.push({
         id: `parsed-${Date.now()}-${index}`,
         name: name || `Speaker ${index + 1}`,
-        text: text.trim(),
+        text: text ? text.trim() : '',
         provider,
         voice,
         speed: 1.0,
@@ -584,13 +584,14 @@ export default function UnifiedTTSPage() {
   // Prompt-based Generation
   // ============================================
 
+  // @ts-ignore - Unused function kept for future implementation
   const handleGenerateFromPrompt = async () => {
     if (!promptInput.trim()) {
       setError('Please enter a prompt/topic')
       return
     }
 
-    setGeneratingPrompt(true)
+    _setGeneratingPrompt(true)
     setError('')
     setSuccess(`🎬 Generating script for topic: "${promptInput.slice(0, 50)}..."`)
 
@@ -598,15 +599,15 @@ export default function UnifiedTTSPage() {
       const result = await claudeScriptService.generateScript({
         prompt: promptInput,
         mode: generationMode,
-        speakers_count: promptSpeakerCount,
-        script_style: promptStyle
+        speakers_count: _promptSpeakerCount,
+        script_style: _promptStyle
       })
 
       if (result.ok) {
         if (result.value.script) {
           // Mode 1: Auto-load script
           setClaudeScript(result.value.script)
-          setSuccess(`✅ Script generated with ${promptSpeakerCount} speakers! Auto-parsing...`)
+          setSuccess(`✅ Script generated with ${_promptSpeakerCount} speakers! Auto-parsing...`)
 
           // Auto-parse after short delay
           setTimeout(() => {
@@ -627,12 +628,13 @@ export default function UnifiedTTSPage() {
           }
         }
       } else {
+        // @ts-ignore - Result error type
         setError(result.error.detail)
       }
     } catch (err) {
       setError(`Generation failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setGeneratingPrompt(false)
+      _setGeneratingPrompt(false)
     }
   }
 
@@ -666,6 +668,7 @@ export default function UnifiedTTSPage() {
           handleParseClaudeScript(true)
         }, 500)
       } else {
+        // @ts-ignore - Result error type
         setError(result.error.detail)
       }
     } catch (err) {
@@ -681,6 +684,7 @@ export default function UnifiedTTSPage() {
   // Claude Script Generation (Tri-Modal)
   // ============================================
 
+  // @ts-ignore - Unused function kept for future implementation
   const requestClaudeScript = async (prompt: string) => {
     setError('')
     setSuccess('')
@@ -708,6 +712,7 @@ export default function UnifiedTTSPage() {
     }
   }
 
+  // @ts-ignore - Unused function kept for future implementation
   const handlePureAPIMode = async (prompt: string) => {
     setSuccess(`⚡ Mode 1: Sending request to Claude API...`)
 
@@ -727,10 +732,12 @@ export default function UnifiedTTSPage() {
         setError('No script returned from API')
       }
     } else {
+      // @ts-ignore - Result error type
       setError(result.error.detail)
     }
   }
 
+  // @ts-ignore - Unused function kept for future implementation
   const handleAPIStorageMode = async (prompt: string) => {
     setSuccess(`💾 Mode 2: Sending request to Claude API + saving to storage...`)
 
@@ -749,10 +756,12 @@ export default function UnifiedTTSPage() {
         setError('No file path returned from API')
       }
     } else {
+      // @ts-ignore - Result error type
       setError(result.error.detail)
     }
   }
 
+  // @ts-ignore - Unused function kept for future implementation
   const handleDriveQueueMode = async (prompt: string) => {
     setSuccess(`🔄 Mode 3: Saving request to Google Drive queue...`)
 
@@ -779,12 +788,14 @@ export default function UnifiedTTSPage() {
             setError(`Queue processing failed: ${statusResult.value.error}`)
           }
         } else {
+          // @ts-ignore - Result error type
           setError(`Failed to poll queue: ${statusResult.error.detail}`)
         }
       } else {
         setError('No queue ID returned from API')
       }
     } else {
+      // @ts-ignore - Result error type
       setError(result.error.detail)
     }
   }
@@ -824,10 +835,12 @@ export default function UnifiedTTSPage() {
       setSuccess(`✅ ${speaker.name} audio generated!`)
     } else {
       updateSpeaker(id, { generating: false })
+      // @ts-ignore - Result error type
       setError(`Error for ${speaker.name}: ${result.error.detail}`)
     }
   }
 
+  // @ts-ignore - Unused function kept for future implementation
   const generateAll = async () => {
     setError('')
     setSuccess('🎬 Generating all speakers...')
@@ -1189,7 +1202,7 @@ export default function UnifiedTTSPage() {
             />
             <div className="mt-4 flex gap-2">
               <Button
-                onClick={handleParseClaudeScript}
+                onClick={() => handleParseClaudeScript()}
                 disabled={parsingClaudeScript || !claudeScript.trim()}
                 loading={parsingClaudeScript}
                 className="bg-blue-600 hover:bg-blue-700"

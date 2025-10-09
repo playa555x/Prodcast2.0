@@ -103,7 +103,7 @@ export function ProjectStatusPanel() {
 
       {/* Steps */}
       <div className="space-y-3 mb-6">
-        {steps.map((step, index) => {
+        {steps.map((step) => {
           const display = getStepStatusDisplay(step.status)
 
           return (
@@ -127,9 +127,9 @@ export function ProjectStatusPanel() {
                     <span className={`text-sm ${display.color}`}>{display.icon}</span>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400">{step.description}</p>
-                  {step.completed_at && (
+                  {step.completedAt && (
                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      ✓ Completed {new Date(step.completed_at).toLocaleDateString()}
+                      ✓ Completed {new Date(step.completedAt).toLocaleDateString()}
                     </p>
                   )}
                   {step.error && (
@@ -191,13 +191,13 @@ export function ProjectStatusPanel() {
                   {rec.priority}
                 </span>
               </div>
-              {rec.action && rec.action_label && (
+              {rec.action && rec.actionLabel && (
                 <Button
                   size="small"
                   onClick={() => router.push(rec.action!)}
                   className="mt-2 bg-indigo-600 hover:bg-indigo-700"
                 >
-                  {rec.action_label} →
+                  {rec.actionLabel} →
                 </Button>
               )}
             </div>

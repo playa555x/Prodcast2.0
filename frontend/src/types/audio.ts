@@ -65,6 +65,8 @@ export interface VoiceInfo {
   description: string | null
   isPremium?: boolean
   pricePerToken?: number
+  provider?: string
+  category?: string
 }
 
 export interface ProviderInfo {

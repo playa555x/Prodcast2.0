@@ -157,7 +157,7 @@ export function AITopicSuggestions({
             </div>
           </div>
 
-          <Button onClick={onRegenerate} variant="outline" size="sm">
+          <Button onClick={onRegenerate} variant="outline" size="small">
             <Zap className="w-4 h-4 mr-2" />
             Neu generieren
           </Button>
@@ -284,7 +284,7 @@ export function AITopicSuggestions({
             <Button
               onClick={() => setSelectedIds(new Set())}
               variant="outline"
-              size="sm"
+              size="small"
               disabled={selectedIds.size === 0}
             >
               Auswahl aufheben

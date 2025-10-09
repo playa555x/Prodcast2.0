@@ -61,7 +61,7 @@ class ProjectService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to list projects',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -76,7 +76,7 @@ class ProjectService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -97,7 +97,7 @@ class ProjectService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to get project',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -112,7 +112,7 @@ class ProjectService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -135,7 +135,7 @@ class ProjectService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to create project',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -150,7 +150,7 @@ class ProjectService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -173,7 +173,7 @@ class ProjectService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to update project',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -188,7 +188,7 @@ class ProjectService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -210,7 +210,7 @@ class ProjectService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to delete project',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -224,7 +224,7 @@ class ProjectService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }

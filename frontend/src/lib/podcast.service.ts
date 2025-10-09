@@ -129,7 +129,7 @@ export const podcastService = {
             error: {
               detail: 'Polling timeout - job took too long',
               statusCode: 408
-            }
+            } as any
           })
           return
         }

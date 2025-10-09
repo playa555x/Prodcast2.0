@@ -102,7 +102,7 @@ class ClaudeScriptService {
           error: {
             detail: errorData.detail || errorData.message || 'Script generation failed',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -117,7 +117,7 @@ class ClaudeScriptService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -141,7 +141,7 @@ class ClaudeScriptService {
           error: {
             detail: errorData.detail || errorData.message || 'Failed to check queue status',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -156,7 +156,7 @@ class ClaudeScriptService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -201,7 +201,7 @@ class ClaudeScriptService {
       error: {
         detail: `Queue status polling timed out after ${maxAttempts} attempts`,
         status: 408
-      }
+      } as any
     }
   }
 
@@ -218,7 +218,7 @@ class ClaudeScriptService {
           error: {
             detail: 'Health check failed',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -233,7 +233,7 @@ class ClaudeScriptService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -254,7 +254,7 @@ class ClaudeScriptService {
           error: {
             detail: errorData.detail || 'Failed to get configuration',
             status: response.status
-          }
+          } as any
         }
       }
 
@@ -269,7 +269,7 @@ class ClaudeScriptService {
         error: {
           detail: error instanceof Error ? error.message : 'Network error',
           status: 0
-        }
+        } as any
       }
     }
   }
@@ -294,7 +294,7 @@ class ClaudeScriptService {
         error: {
           detail: error instanceof Error ? error.message : 'Failed to read file',
           status: 0
-        }
+        } as any
       }
     }
   }

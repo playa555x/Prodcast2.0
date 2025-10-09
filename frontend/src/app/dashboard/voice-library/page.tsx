@@ -201,9 +201,9 @@ export default function VoiceLibraryPage() {
   }
 
   // Get unique values for filters
-  const uniqueProviders = Array.from(new Set(voices.map((v) => v.provider).filter(Boolean)))
-  const uniqueLanguages = Array.from(new Set(voices.map((v) => v.language).filter(Boolean)))
-  const uniqueGenders = Array.from(new Set(voices.map((v) => v.gender).filter(Boolean)))
+  const uniqueProviders = Array.from(new Set(voices.map((v) => v.provider).filter(Boolean))) as string[]
+  const uniqueLanguages = Array.from(new Set(voices.map((v) => v.language).filter(Boolean))) as string[]
+  const uniqueGenders = Array.from(new Set(voices.map((v) => v.gender).filter(Boolean))) as string[]
 
   // Cleanup audio on unmount
   useEffect(() => {
