@@ -23,6 +23,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button, LoadingSpinner, DashboardNavbar } from '@/components'
 import type { Timeline, AudioSegment, TimelineTrack } from '@/types'
+import { ProductionSegmentType } from '@/types'
 import { claudeScriptService } from '@/lib/claude-script.service'
 import type { GenerationMode, ScriptStyle } from '@/lib/claude-script.service'
 
@@ -456,7 +457,7 @@ function StudioContent() {
 
   // View controls
   const [zoom, setZoom] = useState(1.0)
-  const [pixelsPerSecond, setPixelsPerSecond] = useState(10) // 10px/sec for 1-hour podcasts
+  const [pixelsPerSecond] = useState(10) // 10px/sec for 1-hour podcasts
   const [snapToGrid, setSnapToGrid] = useState(true)
   const [gridSize, setGridSize] = useState(1.0) // 1 second grid for fine control
 
@@ -483,7 +484,6 @@ function StudioContent() {
 
   // Mixer
   const [masterVolume, setMasterVolume] = useState(1.0)
-  const [masterEffects, setMasterEffects] = useState<Effect[]>([])
 
   // Effects panel
   const [effectsPanelOpen, setEffectsPanelOpen] = useState(false)
@@ -542,7 +542,7 @@ function StudioContent() {
           segments: safeArray(track.segments).map((seg: any) => ({
             segment_id: safeString(seg.segment_id, `seg-${Date.now()}`),
             segment_number: safeNumber(seg.segment_number, 1),
-            segment_type: safeString(seg.segment_type, 'speech'),
+            segment_type: safeString(seg.segment_type, 'speech') as ProductionSegmentType,
             character_name: safeString(seg.character_name),
             text: safeString(seg.text),
             file_name: safeString(seg.file_name),
@@ -637,7 +637,7 @@ function StudioContent() {
     updateTrack(trackId, { solo: !tracks.find(t => t.track_id === trackId)?.solo })
   }
 
-  const updateSegment = (trackId: string, segmentId: string, updates: Partial<SegmentState>) => {
+  const updateSegment = (trackId: string, segmentId: string, updates: Partial<AudioSegment>) => {
     setTracks(tracks.map(track => {
       if (track.track_id !== trackId) return track
 
@@ -680,22 +680,26 @@ function StudioContent() {
     }
 
     // Create intro segment
-    const introSegment: SegmentState = {
+    const introSegment: AudioSegment = {
       segment_id: `seg-intro-${Date.now()}`,
+      segment_number: 1,
+      segment_type: ProductionSegmentType.MUSIC,
       character_name: musicAsset.name,
       text: `Intro Music: ${musicAsset.name}`,
       start_time: 0,
       duration: musicAsset.duration,
+      end_time: musicAsset.duration,
       audio_path: musicAsset.url,
       audio_url: musicAsset.url,
       provider: 'openai',
-      voice: 'music',
+      voice_name: 'music',
       speed: 1.0,
       pitch: 0,
       volume: 0.5, // Music volume
       fade_in: 0.5,
       fade_out: 2.0, // Longer fade out for intro
-      loop: false
+      loop: false,
+      status: 'completed'
     }
 
     // Add segment to music track
@@ -723,7 +727,7 @@ function StudioContent() {
     tracks.forEach(track => {
       track.segments?.forEach(seg => {
         const endTime = seg.start_time + seg.duration
-        if (endTime > lastEndTime && seg.voice !== 'music') {
+        if (endTime > lastEndTime && seg.voice_name !== 'music') {
           lastEndTime = endTime
         }
       })
@@ -750,22 +754,26 @@ function StudioContent() {
     }
 
     // Create outro segment
-    const outroSegment: SegmentState = {
+    const outroSegment: AudioSegment = {
       segment_id: `seg-outro-${Date.now()}`,
+      segment_number: 1,
+      segment_type: ProductionSegmentType.MUSIC,
       character_name: musicAsset.name,
       text: `Outro Music: ${musicAsset.name}`,
       start_time: lastEndTime + 1.0, // 1 second gap before outro
       duration: musicAsset.duration,
+      end_time: lastEndTime + 1.0 + musicAsset.duration,
       audio_path: musicAsset.url,
       audio_url: musicAsset.url,
       provider: 'openai',
-      voice: 'music',
+      voice_name: 'music',
       speed: 1.0,
       pitch: 0,
       volume: 0.5,
       fade_in: 2.0, // Longer fade in for outro
       fade_out: 1.0,
-      loop: false
+      loop: false,
+      status: 'completed'
     }
 
     // Add segment to music track
@@ -806,22 +814,26 @@ function StudioContent() {
     }
 
     // Create jingle segment
-    const jingleSegment: SegmentState = {
+    const jingleSegment: AudioSegment = {
       segment_id: `seg-jingle-${Date.now()}`,
+      segment_number: 1,
+      segment_type: ProductionSegmentType.MUSIC,
       character_name: musicAsset.name,
       text: `Jingle: ${musicAsset.name}`,
       start_time: insertTime,
       duration: musicAsset.duration,
+      end_time: insertTime + musicAsset.duration,
       audio_path: musicAsset.url,
       audio_url: musicAsset.url,
       provider: 'openai',
-      voice: 'music',
+      voice_name: 'music',
       speed: 1.0,
       pitch: 0,
       volume: 0.6,
       fade_in: 0.3,
       fade_out: 0.3,
-      loop: false
+      loop: false,
+      status: 'completed'
     }
 
     // Add segment to music track (keeping segments sorted)
@@ -874,14 +886,12 @@ function StudioContent() {
         speechSegments.forEach(seg => {
           // Duck down before speech starts
           automation.push({
-            parameter: 'volume',
             time: seg.start - 0.5,
             value: 0.15 // Reduce to 15% volume
           })
 
           // Return to normal after speech ends
           automation.push({
-            parameter: 'volume',
             time: seg.end + 0.5,
             value: 0.5 // Return to 50% volume
           })
@@ -929,7 +939,7 @@ function StudioContent() {
 
     // Calculate how many loops needed
     const loopsNeeded = Math.ceil(maxEndTime / musicAsset.duration)
-    const segments: SegmentState[] = []
+    const segments: AudioSegment[] = []
 
     for (let i = 0; i < loopsNeeded; i++) {
       segments.push({
@@ -941,7 +951,7 @@ function StudioContent() {
         audio_path: musicAsset.url,
         audio_url: musicAsset.url,
         provider: 'openai',
-        voice: 'music',
+        voice_name: 'music',
         speed: 1.0,
         pitch: 0,
         volume: 0.2,
@@ -993,22 +1003,26 @@ function StudioContent() {
     }
 
     // Create SFX segment
-    const sfxSegment: SegmentState = {
+    const sfxSegment: AudioSegment = {
       segment_id: `seg-sfx-${Date.now()}`,
+      segment_number: 1,
+      segment_type: ProductionSegmentType.SFX,
       character_name: sfxAsset.name,
       text: `SFX: ${sfxAsset.name}`,
       start_time: insertTime,
       duration: sfxAsset.duration,
+      end_time: insertTime + sfxAsset.duration,
       audio_path: sfxAsset.url,
       audio_url: sfxAsset.url,
       provider: 'openai',
-      voice: 'sfx',
+      voice_name: 'sfx',
       speed: 1.0,
       pitch: 0,
       volume: volume,
       fade_in: 0.05,
       fade_out: 0.1,
-      loop: false
+      loop: false,
+      status: 'completed'
     }
 
     // Add segment to SFX track (keeping segments sorted)
@@ -1182,7 +1196,7 @@ function StudioContent() {
     let overlapCount = 0
 
     // Find segments where one speaker ends and another begins
-    const allSegments: Array<{ trackId: string; segment: SegmentState }> = []
+    const allSegments: Array<{ trackId: string; segment: AudioSegment }> = []
 
     tracks.forEach(track => {
       track.segments?.forEach(seg => {
@@ -1287,7 +1301,7 @@ function StudioContent() {
   const optimizeDialogTiming = () => {
     let optimizedCount = 0
 
-    const allSegments: Array<{ trackId: string; segment: SegmentState }> = []
+    const allSegments: Array<{ trackId: string; segment: AudioSegment }> = []
 
     tracks.forEach(track => {
       track.segments?.forEach(seg => {
@@ -1414,22 +1428,26 @@ function StudioContent() {
     }
 
     // Create looping ambient segment
-    const ambientSegment: SegmentState = {
+    const ambientSegment: AudioSegment = {
       segment_id: `seg-ambient-${Date.now()}`,
+      segment_number: 1,
+      segment_type: ProductionSegmentType.SFX,
       character_name: sfxAsset.name,
       text: `Ambient Sound: ${sfxAsset.name}`,
       start_time: startTime,
       duration: endTime - startTime,
+      end_time: endTime,
       audio_path: sfxAsset.url,
       audio_url: sfxAsset.url,
       provider: 'openai',
-      voice: 'ambient',
+      voice_name: 'ambient',
       speed: 1.0,
       pitch: 0,
       volume: 0.15, // Very subtle
       fade_in: 2.0,
       fade_out: 3.0,
-      loop: true
+      loop: true,
+      status: 'completed'
     }
 
     // Add segment to ambient track
@@ -1690,7 +1708,7 @@ function StudioContent() {
       const hasIntroMusic = tracks.some(t =>
         t.track_name.toLowerCase().includes('musik') || t.track_name.toLowerCase().includes('music')
       ) && tracks.some(t =>
-        t.segments?.some(s => s.start_time === 0 && s.voice === 'music')
+        t.segments?.some(s => s.start_time === 0 && s.voice_name === 'music')
       )
 
       if (!hasIntroMusic && musicLibrary.length > 0) {
@@ -1717,7 +1735,7 @@ function StudioContent() {
         let lastSpeechTime = 0
         tracks.forEach(t => {
           t.segments?.forEach(s => {
-            if (s.voice !== 'music') {
+            if (s.voice_name !== 'music') {
               const endTime = s.start_time + s.duration
               if (endTime > lastSpeechTime) {
                 lastSpeechTime = endTime
@@ -1729,7 +1747,7 @@ function StudioContent() {
         // Check if there's music after last speech
         return tracks.some(t =>
           t.segments?.some(s =>
-            s.voice === 'music' &&
+            s.voice_name === 'music' &&
             s.start_time >= lastSpeechTime
           )
         )
@@ -1956,11 +1974,11 @@ function StudioContent() {
 
       // Check for opportunities to create overlaps
       const dialogOpportunities: Array<{ track1: string; track2: string; gap: number }> = []
-      const allDialogSegments: Array<{ trackId: string; segment: SegmentState }> = []
+      const allDialogSegments: Array<{ trackId: string; segment: AudioSegment }> = []
 
       tracks.forEach(track => {
         track.segments?.forEach(seg => {
-          if (seg.voice !== 'music' && seg.voice !== 'sfx') {
+          if (seg.voice_name !== 'music' && seg.voice_name !== 'sfx') {
             allDialogSegments.push({ trackId: track.track_id, segment: seg })
           }
         })

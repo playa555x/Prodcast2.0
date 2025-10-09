@@ -17,7 +17,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Card, ErrorAlert, SuccessAlert, DashboardNavbar } from '@/components'
+import { Button, ErrorAlert, SuccessAlert, DashboardNavbar } from '@/components'
 import { researchService } from '@/lib/research.service'
 import {
   ResearchStatus,

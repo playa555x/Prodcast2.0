@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Textarea, Card, ErrorAlert, DashboardNavbar } from '@/components'
+import { Button, Textarea, ErrorAlert, DashboardNavbar } from '@/components'
 import { podcastService } from '@/lib/podcast.service'
 import { ttsService } from '@/lib/tts.service'
 import { VOICE_MAPPINGS, TTSProvider, PodcastStatus, VoiceInfo } from '@/types'
