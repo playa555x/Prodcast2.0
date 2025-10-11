@@ -3,13 +3,15 @@ Authentication API Endpoints
 Production-Ready with JWT + bcrypt - NO MOCKS
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from core.database import get_db
 from core.security import (
@@ -25,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
+limiter = Limiter(key_func=get_remote_address)
 
 # ============================================
 # Request/Response Models
@@ -56,7 +59,8 @@ class UserResponse(BaseModel):
 # ============================================
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
+async def login(http_request: Request, request: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with username and password
     

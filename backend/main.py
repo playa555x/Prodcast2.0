@@ -6,13 +6,16 @@ Version: 2.0.0
 Quality: 12/10 - Production Ready
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Configure Logging
 logging.basicConfig(
@@ -34,9 +37,16 @@ async def lifespan(app: FastAPI):
     logger.info("🔗 API Docs: http://localhost:8001/docs")
 
     # Initialize database
-    from core.database import init_db, create_default_admin, get_db
+    from core.database import init_db, create_default_admin, get_db, check_db_connection
     try:
         logger.info("📊 Initializing database...")
+
+        # Check connection first
+        if not check_db_connection():
+            raise Exception("Cannot connect to database. Check DATABASE_URL in .env")
+
+        logger.info("✅ Database connection verified")
+
         init_db()
 
         # Create default admin user
@@ -47,6 +57,8 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database initialized successfully")
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
+        logger.error("Server will not start. Fix database connection and try again.")
+        raise  # Stop server startup
 
     yield
 
@@ -67,6 +79,14 @@ app = FastAPI(
 )
 
 # ============================================
+# Rate Limiting
+# ============================================
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ============================================
 # CORS Middleware
 # ============================================
 
@@ -80,7 +100,8 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
-        "https://ubiquitous-sprite-b204a9.netlify.app",  # Netlify Production
+        "https://ubiquitous-sprite-b204a9.netlify.app",  # Netlify Production Frontend
+        "https://prodcast2-0-3.onrender.com",  # Production Backend (self-origin for CORS)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -179,17 +200,34 @@ async def http_exception_handler(request, exc):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
-    """Catch-all exception handler"""
+    """Catch-all exception handler with CORS support"""
+    from core.config import settings
+
     logger.error(f"Unexpected Error: {str(exc)}", exc_info=True)
-    return JSONResponse(
+
+    # In development, show actual error for debugging
+    error_detail = str(exc) if settings.DEBUG else "Internal server error"
+
+    response = JSONResponse(
         status_code=500,
         content={
             "error": True,
-            "message": "Internal server error",
+            "message": error_detail,
+            "type": type(exc).__name__,
             "status_code": 500,
             "timestamp": datetime.utcnow().isoformat()
         }
     )
+
+    # Ensure CORS headers are added even to error responses
+    origin = request.headers.get("Origin", "")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+    return response
 
 # ============================================
 # Run Application

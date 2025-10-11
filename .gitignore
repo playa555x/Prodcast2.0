@@ -5,9 +5,14 @@ backend/__pycache__/
 frontend/.next/
 frontend/nul
 
-# Environment variables
+# Environment variables (NEVER COMMIT THESE!)
 .env
 .env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env.local
+frontend/.env.production
 
 # Build outputs
 dist/
