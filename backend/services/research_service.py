@@ -13,6 +13,7 @@ from datetime import datetime
 import uuid
 
 from services.claude_api import ClaudeAPIService
+from services.mcp_client import get_mcp_client
 from models.research import (
     ResearchRequest, ResearchResult, ResearchSource,
     PodcastCharacter, CharacterType, AudienceType,
@@ -136,25 +137,47 @@ class PodcastResearchService:
             )
 
     async def _research_youtube(self, topic: str) -> List[ResearchSource]:
-        """Research YouTube videos (via MCP if available)"""
-        # TODO: Implement MCP YouTube integration
-        # For now, return mock data
+        """Research YouTube videos via MCP"""
         logger.info(f"YouTube research for: {topic}")
 
-        return [
-            ResearchSource(
-                source_type="youtube",
-                title=f"{topic} - Expertenvideo",
-                url="https://youtube.com/watch?v=example",
-                summary=f"Detailliertes Video über {topic} mit Experteneinschätzungen",
-                key_insights=[
-                    "Hauptaspekt 1",
-                    "Wichtiger Punkt 2",
-                    "Praxisbeispiel 3"
-                ],
-                credibility_score=0.8
+        sources = []
+
+        try:
+            # Get MCP client
+            mcp = await get_mcp_client()
+
+            # Search YouTube via MCP
+            videos = await mcp.search_youtube(
+                query=topic,
+                max_results=3
             )
-        ]
+
+            # Convert to ResearchSource objects
+            for video in videos:
+                snippet = video.get("snippet", {})
+                video_id = video.get("id", {}).get("videoId", "")
+
+                source = ResearchSource(
+                    source_type="youtube",
+                    title=snippet.get("title", f"{topic} Video"),
+                    url=f"https://youtube.com/watch?v={video_id}" if video_id else None,
+                    summary=snippet.get("description", f"Video about {topic}")[:200],
+                    key_insights=[
+                        snippet.get("title", ""),
+                        f"Channel: {snippet.get('channelTitle', 'Unknown')}",
+                        f"Published: {snippet.get('publishedAt', 'Unknown')}"
+                    ],
+                    credibility_score=0.8
+                )
+                sources.append(source)
+
+            logger.info(f"✅ Found {len(sources)} YouTube videos via MCP")
+
+        except Exception as e:
+            logger.error(f"YouTube MCP research failed: {e}")
+            # Return empty list on error - service will continue with other sources
+
+        return sources
 
     async def _research_podcasts(self, topic: str) -> List[ResearchSource]:
         """Analyze best podcasts for format inspiration"""
@@ -179,38 +202,66 @@ class PodcastResearchService:
         ]
 
     async def _research_web(self, topic: str, scientific: bool, everyday: bool) -> List[ResearchSource]:
-        """Research web sources"""
+        """Research web sources via MCP"""
         logger.info(f"Web research for: {topic} (scientific={scientific}, everyday={everyday})")
 
         sources = []
 
-        if scientific:
-            sources.append(ResearchSource(
-                source_type="scientific",
-                title=f"{topic} - Wissenschaftliche Erkenntnisse",
-                url="https://scholar.google.com",
-                summary=f"Aktuelle Forschungsergebnisse zu {topic} aus peer-reviewed Journals",
-                key_insights=[
-                    "Wissenschaftlicher Fakt 1",
-                    "Studie zeigt 2",
-                    "Forschungsergebnis 3"
-                ],
-                credibility_score=0.95
-            ))
+        try:
+            # Get MCP client
+            mcp = await get_mcp_client()
 
-        if everyday:
-            sources.append(ResearchSource(
-                source_type="web",
-                title=f"{topic} im Alltag",
-                url="https://example.com",
-                summary=f"Praktische Anwendungen und Alltagsbezüge zu {topic}",
-                key_insights=[
-                    "Alltagsbeispiel 1",
-                    "Praktische Anwendung 2",
-                    "Reales Szenario 3"
-                ],
-                credibility_score=0.7
-            ))
+            # Build search queries
+            queries = []
+            if scientific:
+                queries.append(f"{topic} research study scientific")
+            if everyday:
+                queries.append(f"{topic} practical everyday use")
+
+            # Search web via MCP for each query
+            for query in queries:
+                try:
+                    results = await mcp.search_web(
+                        query=query,
+                        max_results=5
+                    )
+
+                    # Convert to ResearchSource objects
+                    for result in results[:3]:  # Take top 3 per query
+                        source_type = "scientific" if "research" in query or "scientific" in query else "web"
+
+                        source = ResearchSource(
+                            source_type=source_type,
+                            title=result.get("title", f"{topic} Article"),
+                            url=result.get("url", None),
+                            summary=result.get("description", f"Article about {topic}")[:300],
+                            key_insights=[
+                                result.get("title", "")[:100],
+                                f"Published: {result.get('publishedDate', 'Unknown')}",
+                                "Source: Web Search via MCP"
+                            ],
+                            credibility_score=0.85 if source_type == "scientific" else 0.7
+                        )
+                        sources.append(source)
+
+                    logger.info(f"✅ Found {len(results)} web results for '{query}' via MCP")
+
+                except Exception as e:
+                    logger.error(f"Web search failed for '{query}': {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Web MCP research failed: {e}")
+            # Fallback to basic sources on error
+            if scientific:
+                sources.append(ResearchSource(
+                    source_type="scientific",
+                    title=f"{topic} - Scientific Research",
+                    url="https://scholar.google.com",
+                    summary=f"Scientific research about {topic} (Fallback)",
+                    key_insights=["Research data not available", "MCP connection failed"],
+                    credibility_score=0.5
+                ))
 
         return sources
 

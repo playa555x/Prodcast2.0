@@ -82,6 +82,11 @@ black==24.1.1
 # For request rate limiting (REQUIRED for production)
 slowapi==0.1.9
 
+# For Model Context Protocol (MCP) integration
+mcp==1.17.0
+httpx-sse==0.4.3
+sse-starlette==3.0.2
+
 # ============================================
 # NOTES:
 # - All versions are pinned for reproducibility
