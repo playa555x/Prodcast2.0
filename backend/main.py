@@ -201,7 +201,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],  # Expose request ID to frontend
+    expose_headers=["*", "X-Request-ID"],  # Expose all headers including request ID
 )
 
 # Add Request ID Middleware
