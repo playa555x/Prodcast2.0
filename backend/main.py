@@ -16,6 +16,8 @@ from datetime import datetime
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import shutil
+import subprocess
 
 # Configure Logging
 logging.basicConfig(
@@ -28,6 +30,45 @@ logger = logging.getLogger(__name__)
 # Application Lifespan
 # ============================================
 
+def check_mcp_prerequisites() -> bool:
+    """Check if MCP prerequisites are available"""
+    from core.config import settings
+
+    if not (settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED):
+        return True  # MCP not needed
+
+    # Check for npx
+    if not shutil.which("npx"):
+        logger.error("❌ MCP enabled but 'npx' command not found")
+        logger.error("Please install Node.js 18+ from: https://nodejs.org/")
+        logger.error("After installation, restart the server")
+        return False
+
+    # Check Node.js version
+    try:
+        result = subprocess.run(
+            ["node", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        version = result.stdout.strip()
+        logger.info(f"✅ Node.js version: {version}")
+
+        # Check if version is at least 18
+        major_version = int(version.lstrip('v').split('.')[0])
+        if major_version < 18:
+            logger.warning(f"⚠️ Node.js {major_version} detected. MCP requires Node.js 18+")
+            logger.warning("Please upgrade Node.js from: https://nodejs.org/")
+            return False
+
+    except Exception as e:
+        logger.warning(f"Could not verify Node.js version: {e}")
+
+    logger.info("✅ MCP prerequisites available")
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
@@ -35,6 +76,12 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting GedächtnisBoost Premium API...")
     logger.info("📡 Environment: Development")
     logger.info("🔗 API Docs: http://localhost:8001/docs")
+
+    # Check MCP prerequisites
+    if not check_mcp_prerequisites():
+        logger.warning("⚠️ MCP features will be disabled")
+        logger.warning("Set MCP_YOUTUBE_ENABLED=false and MCP_WEB_SCRAPING_ENABLED=false")
+        logger.warning("Or install Node.js 18+ to enable MCP features")
 
     # Initialize database
     from core.database import init_db, create_default_admin, get_db, check_db_connection
@@ -60,10 +107,32 @@ async def lifespan(app: FastAPI):
         logger.error("Server will not start. Fix database connection and try again.")
         raise  # Stop server startup
 
+    # Initialize MCP if enabled
+    from core.config import settings
+    if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
+        logger.info("🔌 MCP enabled - initializing client...")
+        try:
+            from services.mcp_client import get_mcp_client
+            await get_mcp_client()
+            logger.info("✅ MCP client initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ MCP initialization failed: {e}")
+            logger.warning("MCP features will use fallback methods")
+
     yield
 
     # Shutdown
     logger.info("👋 Shutting down GedächtnisBoost Premium API...")
+
+    # Close MCP client
+    if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
+        logger.info("Closing MCP connections...")
+        try:
+            from services.mcp_client import close_mcp_client
+            await close_mcp_client()
+            logger.info("✅ MCP connections closed")
+        except Exception as e:
+            logger.error(f"Error closing MCP: {e}")
 
 # ============================================
 # FastAPI Application

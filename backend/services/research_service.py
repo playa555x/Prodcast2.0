@@ -142,9 +142,23 @@ class PodcastResearchService:
 
         sources = []
 
+        # Check if MCP is enabled in config
+        if not settings.MCP_YOUTUBE_ENABLED:
+            logger.warning("YouTube MCP disabled in configuration")
+            return sources
+
         try:
             # Get MCP client
             mcp = await get_mcp_client()
+
+            # Check if client is actually initialized and has session
+            if not mcp._initialized:
+                logger.warning("MCP client not initialized")
+                return sources
+
+            if not mcp.youtube_session:
+                logger.warning("YouTube MCP session not available")
+                return sources
 
             # Search YouTube via MCP
             videos = await mcp.search_youtube(
@@ -174,7 +188,7 @@ class PodcastResearchService:
             logger.info(f"✅ Found {len(sources)} YouTube videos via MCP")
 
         except Exception as e:
-            logger.error(f"YouTube MCP research failed: {e}")
+            logger.error(f"YouTube MCP research failed: {e}", exc_info=True)
             # Return empty list on error - service will continue with other sources
 
         return sources
@@ -207,9 +221,19 @@ class PodcastResearchService:
 
         sources = []
 
+        # Check if MCP is enabled
+        if not settings.MCP_WEB_SCRAPING_ENABLED:
+            logger.warning("Web scraping MCP disabled in configuration")
+            return sources
+
         try:
             # Get MCP client
             mcp = await get_mcp_client()
+
+            # Check availability
+            if not mcp._initialized or not mcp.web_session:
+                logger.warning("Web MCP session not available")
+                return sources
 
             # Build search queries
             queries = []
@@ -247,21 +271,12 @@ class PodcastResearchService:
                     logger.info(f"✅ Found {len(results)} web results for '{query}' via MCP")
 
                 except Exception as e:
-                    logger.error(f"Web search failed for '{query}': {e}")
+                    logger.error(f"Web search failed for '{query}': {e}", exc_info=True)
                     continue
 
         except Exception as e:
-            logger.error(f"Web MCP research failed: {e}")
-            # Fallback to basic sources on error
-            if scientific:
-                sources.append(ResearchSource(
-                    source_type="scientific",
-                    title=f"{topic} - Scientific Research",
-                    url="https://scholar.google.com",
-                    summary=f"Scientific research about {topic} (Fallback)",
-                    key_insights=["Research data not available", "MCP connection failed"],
-                    credibility_score=0.5
-                ))
+            logger.error(f"Web MCP research failed: {e}", exc_info=True)
+            # Return empty list - no fallback mock data
 
         return sources
 

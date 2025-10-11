@@ -26,6 +26,12 @@ class MCPClientService:
         """Initialize MCP client"""
         self.youtube_session: Optional[ClientSession] = None
         self.web_session: Optional[ClientSession] = None
+        self.youtube_stdio = None
+        self.web_stdio = None
+        self.youtube_read = None
+        self.youtube_write = None
+        self.web_read = None
+        self.web_write = None
         self._initialized = False
 
     async def initialize(self):
@@ -57,25 +63,27 @@ class MCPClientService:
         try:
             logger.info("Connecting to YouTube MCP server...")
 
-            # MCP servers are typically run as separate processes
-            # Connect via stdio transport
             server_params = StdioServerParameters(
                 command="npx",
                 args=["-y", "@modelcontextprotocol/server-youtube"],
                 env=None
             )
 
-            # Create client session
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    self.youtube_session = session
-                    logger.info("✅ YouTube MCP connected")
+            # Create client session (manual lifecycle management)
+            self.youtube_stdio = stdio_client(server_params)
+            self.youtube_read, self.youtube_write = await self.youtube_stdio.__aenter__()
+
+            self.youtube_session = ClientSession(self.youtube_read, self.youtube_write)
+            await self.youtube_session.__aenter__()
+            await self.youtube_session.initialize()
+
+            logger.info("✅ YouTube MCP connected")
 
         except Exception as e:
             logger.warning(f"YouTube MCP connection failed: {e}")
             logger.info("YouTube research will use fallback method")
             self.youtube_session = None
+            self.youtube_stdio = None
 
     async def _init_web_mcp(self):
         """Initialize Web Search MCP server connection"""
@@ -88,16 +96,20 @@ class MCPClientService:
                 env=None
             )
 
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    self.web_session = session
-                    logger.info("✅ Web Search MCP connected")
+            self.web_stdio = stdio_client(server_params)
+            self.web_read, self.web_write = await self.web_stdio.__aenter__()
+
+            self.web_session = ClientSession(self.web_read, self.web_write)
+            await self.web_session.__aenter__()
+            await self.web_session.initialize()
+
+            logger.info("✅ Web Search MCP connected")
 
         except Exception as e:
             logger.warning(f"Web Search MCP connection failed: {e}")
             logger.info("Web search will use fallback method")
             self.web_session = None
+            self.web_stdio = None
 
     async def search_youtube(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """
@@ -115,13 +127,16 @@ class MCPClientService:
             return await self._fallback_youtube_search(query)
 
         try:
-            # Call YouTube MCP tool
-            result = await self.youtube_session.call_tool(
-                "youtube_search",
-                arguments={
-                    "query": query,
-                    "maxResults": max_results
-                }
+            # Call YouTube MCP tool with timeout
+            result = await asyncio.wait_for(
+                self.youtube_session.call_tool(
+                    "youtube_search",
+                    arguments={
+                        "query": query,
+                        "maxResults": max_results
+                    }
+                ),
+                timeout=30.0  # 30 second timeout
             )
 
             # Parse results
@@ -132,8 +147,11 @@ class MCPClientService:
 
             return []
 
+        except asyncio.TimeoutError:
+            logger.error(f"YouTube MCP search timed out after 30s for: {query}")
+            return await self._fallback_youtube_search(query)
         except Exception as e:
-            logger.error(f"YouTube MCP search failed: {e}")
+            logger.error(f"YouTube MCP search failed: {e}", exc_info=True)
             return await self._fallback_youtube_search(query)
 
     async def search_web(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
@@ -152,13 +170,16 @@ class MCPClientService:
             return await self._fallback_web_search(query)
 
         try:
-            # Call Web Search MCP tool
-            result = await self.web_session.call_tool(
-                "brave_web_search",
-                arguments={
-                    "query": query,
-                    "count": max_results
-                }
+            # Call Web Search MCP tool with timeout
+            result = await asyncio.wait_for(
+                self.web_session.call_tool(
+                    "brave_web_search",
+                    arguments={
+                        "query": query,
+                        "count": max_results
+                    }
+                ),
+                timeout=30.0  # 30 second timeout
             )
 
             # Parse results
@@ -169,8 +190,11 @@ class MCPClientService:
 
             return []
 
+        except asyncio.TimeoutError:
+            logger.error(f"Web Search MCP timed out after 30s for: {query}")
+            return await self._fallback_web_search(query)
         except Exception as e:
-            logger.error(f"Web Search MCP failed: {e}")
+            logger.error(f"Web Search MCP failed: {e}", exc_info=True)
             return await self._fallback_web_search(query)
 
     def _parse_youtube_results(self, content: Any) -> List[Dict[str, Any]]:
@@ -227,50 +251,41 @@ class MCPClientService:
 
     async def _fallback_youtube_search(self, query: str) -> List[Dict[str, Any]]:
         """Fallback YouTube search when MCP not available"""
-        logger.info(f"Using fallback YouTube search for: {query}")
-
-        # Return mock data structure for now
-        # In production, you could use youtube-search-python or similar
-        return [
-            {
-                "id": {"videoId": "mock_id"},
-                "snippet": {
-                    "title": f"{query} - Expert Video",
-                    "description": f"Comprehensive video about {query}",
-                    "channelTitle": "Expert Channel",
-                    "publishedAt": "2024-01-01T00:00:00Z"
-                }
-            }
-        ]
+        logger.warning(f"YouTube search not available for: {query}")
+        logger.warning("Configure MCP_YOUTUBE_ENABLED and ensure npx is installed")
+        # Return empty list - no mock data
+        return []
 
     async def _fallback_web_search(self, query: str) -> List[Dict[str, Any]]:
         """Fallback web search when MCP not available"""
-        logger.info(f"Using fallback web search for: {query}")
-
-        # Return mock data structure
-        return [
-            {
-                "title": f"{query} - Comprehensive Guide",
-                "url": f"https://example.com/article/{query.replace(' ', '-')}",
-                "description": f"In-depth article about {query} with expert insights",
-                "publishedDate": "2024-01-01"
-            }
-        ]
+        logger.warning(f"Web search not available for: {query}")
+        logger.warning("Configure MCP_WEB_SCRAPING_ENABLED and ensure npx is installed")
+        # Return empty list - no mock data
+        return []
 
     async def close(self):
         """Close MCP connections"""
         if self.youtube_session:
             try:
-                # Close session properly
-                pass  # Session closes automatically in context manager
+                await self.youtube_session.__aexit__(None, None, None)
+                await self.youtube_stdio.__aexit__(None, None, None)
+                logger.info("Closed YouTube MCP session")
             except Exception as e:
                 logger.error(f"Error closing YouTube MCP: {e}")
+            finally:
+                self.youtube_session = None
+                self.youtube_stdio = None
 
         if self.web_session:
             try:
-                pass  # Session closes automatically in context manager
+                await self.web_session.__aexit__(None, None, None)
+                await self.web_stdio.__aexit__(None, None, None)
+                logger.info("Closed Web MCP session")
             except Exception as e:
                 logger.error(f"Error closing Web MCP: {e}")
+            finally:
+                self.web_session = None
+                self.web_stdio = None
 
         self._initialized = False
         logger.info("MCP client connections closed")
@@ -278,11 +293,12 @@ class MCPClientService:
 
 # Global MCP client instance
 _mcp_client: Optional[MCPClientService] = None
+_mcp_client_lock = asyncio.Lock()  # Add lock for thread-safety
 
 
 async def get_mcp_client() -> MCPClientService:
     """
-    Get or create MCP client instance
+    Get or create MCP client instance (thread-safe)
 
     Returns:
         MCPClientService instance
@@ -290,8 +306,11 @@ async def get_mcp_client() -> MCPClientService:
     global _mcp_client
 
     if _mcp_client is None:
-        _mcp_client = MCPClientService()
-        await _mcp_client.initialize()
+        async with _mcp_client_lock:  # Thread-safe initialization
+            # Double-check after acquiring lock
+            if _mcp_client is None:
+                _mcp_client = MCPClientService()
+                await _mcp_client.initialize()
 
     return _mcp_client
 
