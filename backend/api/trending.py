@@ -10,19 +10,15 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List, Dict
 import logging
 
-from services.trending_service import TrendingService
+from services.trending_service_v2 import TrendingServiceV2
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Initialize trending service
-trending_service = TrendingService(
-    newsapi_key=getattr(settings, 'NEWSAPI_KEY', None),
-    youtube_api_key=getattr(settings, 'YOUTUBE_API_KEY', None),
-    podchaser_api_key=getattr(settings, 'PODCHASER_API_KEY', None)
-)
+# Initialize trending service V2 (NO API KEYS NEEDED!)
+trending_service = TrendingServiceV2()
 
 # ============================================
 # Trending Endpoints
@@ -34,15 +30,16 @@ async def get_google_trends(
     limit: int = Query(20, ge=1, le=50, description="Max number of trends")
 ):
     """
-    Get trending searches from Google Trends
+    Get real-time trending searches from Google Trends RSS
 
-    Free, no API key required
+    ✅ Free, no API key required
+    ✅ Real-time data from trending.google.com
     """
     try:
-        trends = await trending_service.get_google_trends(region=region, limit=limit)
+        trends = await trending_service.get_google_trends_realtime(region=region, limit=limit)
         return {
             "success": True,
-            "source": "Google Trends",
+            "source": "Google Trends (Real-time RSS)",
             "region": region,
             "count": len(trends),
             "trends": trends
@@ -55,33 +52,25 @@ async def get_google_trends(
 @router.get("/trending/news")
 async def get_news_headlines(
     country: str = Query("de", description="Country code (de, us, gb, etc.)"),
-    category: Optional[str] = Query(None, description="Category (business, technology, etc.)"),
+    category: Optional[str] = Query(None, description="Category (not used in RSS version)"),
     limit: int = Query(10, ge=1, le=50, description="Max number of headlines")
 ):
     """
-    Get top news headlines from NewsAPI
+    Get latest news from RSS feeds
 
-    Requires NewsAPI key (100 requests/day free tier)
+    ✅ Free, no API key required
+    ✅ Real-time data from Tagesschau, Spiegel, BBC, NY Times, etc.
     """
     try:
-        headlines = await trending_service.get_top_headlines(
+        headlines = await trending_service.get_news_from_rss(
             country=country,
-            category=category,
             limit=limit
         )
 
-        if not headlines and not trending_service.newsapi_key:
-            return {
-                "success": False,
-                "message": "NewsAPI key not configured. Please add NEWSAPI_KEY to .env file",
-                "headlines": []
-            }
-
         return {
             "success": True,
-            "source": "NewsAPI",
+            "source": "RSS Feeds (Tagesschau, Spiegel, BBC, etc.)",
             "country": country,
-            "category": category or "general",
             "count": len(headlines),
             "headlines": headlines
         }
@@ -255,37 +244,55 @@ async def get_spotify_trends(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/trending/hackernews")
+async def get_hackernews_trends(
+    limit: int = Query(20, ge=1, le=50, description="Max number of stories")
+):
+    """
+    Get trending tech topics from HackerNews
+
+    ✅ Free, no API key required
+    ✅ Real-time data from news.ycombinator.com
+    """
+    try:
+        trends = await trending_service.get_hackernews_trends(limit=limit)
+        return {
+            "success": True,
+            "source": "HackerNews",
+            "count": len(trends),
+            "trends": trends
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch HackerNews trends: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/trending/all")
 async def get_all_trends(
     region: str = Query("DE", description="Country/region code"),
-    include_news: bool = Query(True, description="Include NewsAPI headlines"),
+    include_news: bool = Query(True, description="Include RSS news feeds"),
     include_reddit: bool = Query(True, description="Include Reddit trends"),
-    include_youtube: bool = Query(True, description="Include YouTube trends"),
     include_twitter: bool = Query(True, description="Include Twitter/X trends"),
-    include_tiktok: bool = Query(False, description="Include TikTok trends (may be limited)"),
-    include_spotify: bool = Query(True, description="Include Spotify podcast trends")
+    include_hackernews: bool = Query(True, description="Include HackerNews trends")
 ):
     """
     Get all trending topics from all available sources
 
-    Aggregates data from:
-    - Google Trends (always included, free)
-    - NewsAPI (optional, requires key)
-    - Reddit (optional, free)
-    - YouTube (optional, requires key)
-    - Twitter/X (optional, free via web scraping)
-    - TikTok (optional, limited data via web scraping)
-    - Spotify Podcasts (optional, free via web scraping or Podchaser API)
+    ✅ 100% FREE - NO API KEYS REQUIRED!
+    ✅ Real-time data from:
+    - Google Trends (always included)
+    - RSS News (Tagesschau, Spiegel, BBC, NY Times)
+    - Reddit (public JSON API)
+    - Twitter/X (via getdaytrends.com)
+    - HackerNews (tech trends)
     """
     try:
         all_trends = await trending_service.get_all_trends(
             region=region,
             include_news=include_news,
             include_reddit=include_reddit,
-            include_youtube=include_youtube,
             include_twitter=include_twitter,
-            include_tiktok=include_tiktok,
-            include_spotify=include_spotify
+            include_hackernews=include_hackernews
         )
 
         return {
@@ -306,8 +313,9 @@ async def get_podcast_topic_ideas(
     """
     Generate podcast topic ideas based on current trends
 
-    Uses rule-based analysis of trending data to suggest topics
-    No AI required - completely free!
+    ✅ Free, no API key required
+    ✅ Rule-based analysis (no AI needed)
+    ✅ Real-time trending topics from multiple sources
     """
     try:
         # Fetch all trends
@@ -315,7 +323,8 @@ async def get_podcast_topic_ideas(
             region=region,
             include_news=True,
             include_reddit=True,
-            include_youtube=False  # YouTube not needed for topic generation
+            include_twitter=True,
+            include_hackernews=True
         )
 
         # Generate podcast topics
@@ -328,6 +337,7 @@ async def get_podcast_topic_ideas(
             "topics": topics,
             "metadata": {
                 "sources_used": all_trends.get("metadata", {}).get("sources_count", 0),
+                "total_trends": all_trends.get("metadata", {}).get("total_trends", 0),
                 "generated_at": all_trends.get("metadata", {}).get("timestamp")
             }
         }

@@ -48,9 +48,10 @@ httpx==0.27.2
 # ============================================
 # Trending Topics & Data Analysis
 # ============================================
-pytrends==4.9.2
+# pytrends==4.9.2  # Disabled - Google API broken
 beautifulsoup4==4.12.2
 lxml==5.1.0
+feedparser==6.0.11  # For RSS feed parsing
 
 # ============================================
 # TTS Services
