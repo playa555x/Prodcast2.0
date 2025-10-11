@@ -21,6 +21,8 @@ import asyncio
 from bs4 import BeautifulSoup
 import re
 
+from services.mcp_client import get_mcp_client
+
 logger = logging.getLogger(__name__)
 
 class TrendingService:
@@ -114,7 +116,7 @@ class TrendingService:
         limit: int = 10
     ) -> List[Dict]:
         """
-        Get top news headlines from NewsAPI
+        Get top news headlines via MCP Web Search
 
         Args:
             country: Country code (de, us, gb, etc.)
@@ -122,50 +124,53 @@ class TrendingService:
             limit: Max number of headlines
 
         Returns:
-            List of news headlines
+            List of news headlines from MCP web search
         """
-        if not self.newsapi_key:
-            logger.warning("NewsAPI key not configured, returning empty list")
-            return []
-
         try:
-            url = "https://newsapi.org/v2/top-headlines"
-            params = {
-                "apiKey": self.newsapi_key,
-                "country": country,
-                "pageSize": limit
+            mcp = await get_mcp_client()
+
+            # Build search query based on category and country
+            country_map = {
+                "de": "Deutschland Germany",
+                "us": "United States USA",
+                "gb": "United Kingdom UK",
+                "fr": "France",
+                "es": "Spain España",
+                "it": "Italy Italia",
+                "jp": "Japan 日本",
+                "br": "Brazil Brasil",
+                "in": "India",
+                "au": "Australia",
+                "ca": "Canada",
+                "mx": "Mexico"
             }
 
+            country_name = country_map.get(country.lower(), country)
+
             if category:
-                params["category"] = category
+                query = f"breaking {category} news {country_name} today"
+            else:
+                query = f"breaking news {country_name} today headlines"
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url, params=params)
+            results = await mcp.search_web(query=query, max_results=limit * 2)
 
-                if response.status_code == 200:
-                    data = response.json()
-                    articles = data.get("articles", [])
+            headlines = []
+            for idx, result in enumerate(results[:limit]):
+                headlines.append({
+                    "rank": idx + 1,
+                    "title": result.get("title", ""),
+                    "description": result.get("description", ""),
+                    "source": "MCP Web Search",
+                    "url": result.get("url", ""),
+                    "publishedAt": result.get("publishedDate", datetime.utcnow().isoformat()),
+                    "category": category or "general"
+                })
 
-                    headlines = []
-                    for idx, article in enumerate(articles):
-                        headlines.append({
-                            "rank": idx + 1,
-                            "title": article.get("title"),
-                            "description": article.get("description"),
-                            "source": article.get("source", {}).get("name"),
-                            "url": article.get("url"),
-                            "publishedAt": article.get("publishedAt"),
-                            "category": category or "general"
-                        })
-
-                    logger.info(f"Fetched {len(headlines)} headlines from NewsAPI")
-                    return headlines
-                else:
-                    logger.error(f"NewsAPI error: {response.status_code}")
-                    return []
+            logger.info(f"Fetched {len(headlines)} headlines via MCP Web Search")
+            return headlines
 
         except Exception as e:
-            logger.error(f"Failed to fetch news headlines: {e}")
+            logger.error(f"Failed to fetch headlines via MCP: {e}")
             return []
 
     # ============================================
@@ -814,8 +819,8 @@ class TrendingService:
         # Google Trends (always included)
         tasks.append(("google_trends", self.get_google_trends(region=region)))
 
-        # NewsAPI
-        if include_news and self.newsapi_key:
+        # News Headlines (via MCP Web Search)
+        if include_news:
             country_code = region.lower()
             tasks.append(("news_headlines", self.get_top_headlines(country=country_code)))
 
