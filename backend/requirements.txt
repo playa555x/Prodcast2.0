@@ -41,7 +41,9 @@ bcrypt==4.0.1
 # ============================================
 # HTTP Client
 # ============================================
-httpx==0.26.0
+# UPDATED: httpx 0.27.0 required for MCP 1.17.0 compatibility
+# Compatible with both openai (>=0.23.0, <1) and mcp (>=0.27.1)
+httpx==0.27.0
 
 # ============================================
 # Trending Topics & Data Analysis
