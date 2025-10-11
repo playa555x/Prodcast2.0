@@ -78,11 +78,17 @@ class PodcastResearchService:
             ResearchResult with all sources
         """
         sources: List[ResearchSource] = []
+        warnings: List[str] = []
+        mcp_used = False
 
         # YouTube research (if enabled)
         if request.include_youtube and settings.MCP_YOUTUBE_ENABLED:
             youtube_sources = await self._research_youtube(request.topic)
-            sources.extend(youtube_sources)
+            if youtube_sources:
+                sources.extend(youtube_sources)
+                mcp_used = True
+            else:
+                warnings.append("YouTube research unavailable - limited video insights")
 
         # Podcast research (best practices)
         if request.include_podcasts:
@@ -96,10 +102,22 @@ class PodcastResearchService:
                 scientific=request.include_scientific,
                 everyday=request.include_everyday
             )
-            sources.extend(web_sources)
+            if web_sources:
+                sources.extend(web_sources)
+                mcp_used = True
+            else:
+                if request.include_scientific:
+                    warnings.append("Scientific research unavailable - limited academic sources")
+                if request.include_everyday:
+                    warnings.append("Web search unavailable - limited practical examples")
 
         # Limit sources
         sources = sources[:settings.RESEARCH_MAX_SOURCES]
+
+        # Determine data quality
+        data_quality = "full"
+        if warnings:
+            data_quality = "partial" if len(sources) > 0 else "fallback"
 
         # Get Claude analysis
         sources_summary = "\n\n".join([
@@ -122,7 +140,10 @@ class PodcastResearchService:
                 sources=sources,
                 key_findings=analysis_data.get("key_findings", []),
                 suggested_structure=analysis_data.get("structure", []),
-                estimated_quality_score=analysis_data.get("quality_score", 7.0)
+                estimated_quality_score=analysis_data.get("quality_score", 7.0),
+                data_quality=data_quality,
+                warnings=warnings,
+                mcp_used=mcp_used
             )
         except Exception as e:
             logger.error(f"Claude analysis failed: {e}")
@@ -133,7 +154,10 @@ class PodcastResearchService:
                 sources=sources,
                 key_findings=[f"Source: {s.title}" for s in sources[:5]],
                 suggested_structure=["Intro", "Main Discussion", "Conclusion"],
-                estimated_quality_score=6.0
+                estimated_quality_score=6.0,
+                data_quality=data_quality,
+                warnings=warnings,
+                mcp_used=mcp_used
             )
 
     async def _research_youtube(self, topic: str) -> List[ResearchSource]:

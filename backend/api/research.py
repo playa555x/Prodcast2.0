@@ -3,7 +3,7 @@ Research API Endpoints
 AI-Powered Podcast Research & Script Generation
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import logging
@@ -92,9 +92,53 @@ async def execute_research_job(job_id: str, request: ResearchRequest, db: Sessio
 # Research Endpoints
 # ============================================
 
-@router.post("/start", response_model=ResearchJobResponse)
+@router.post(
+    "/start",
+    response_model=ResearchJobResponse,
+    responses={
+        200: {
+            "description": "Research job started successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "job_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "status": "pending",
+                        "topic": "Quantum Computing",
+                        "research_completed": False
+                    }
+                }
+            }
+        },
+        503: {
+            "description": "Service Unavailable - Claude AI or MCP not configured",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": True,
+                        "message": "Claude AI not configured. Please set ANTHROPIC_API_KEY in .env",
+                        "status_code": 503
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - MCP integration failure",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": True,
+                        "message": "MCP YouTube/Web search unavailable. Research will use fallback methods.",
+                        "status_code": 500,
+                        "data_quality": "partial"
+                    }
+                }
+            }
+        }
+    }
+)
 async def start_research(
-    request: ResearchRequest,
+    research_request: ResearchRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     user_data: dict = Depends(get_current_user_data),
     db: Session = Depends(get_db)
@@ -103,15 +147,27 @@ async def start_research(
     Start AI-powered podcast research
 
     This will:
-    1. Research YouTube, podcasts, scientific sources, web
+    1. Research YouTube, podcasts, scientific sources, web (via MCP if enabled)
     2. Analyze with Claude AI
     3. Generate 3 script variants (young, middle-aged, scientific)
     4. Save to filesystem
     5. Provide recommendation
 
     Returns job_id for status tracking
+
+    **MCP Integration:**
+    - If MCP_YOUTUBE_ENABLED=true: Uses @modelcontextprotocol/server-youtube for video research
+    - If MCP_WEB_SCRAPING_ENABLED=true: Uses @modelcontextprotocol/server-brave-search for web research
+    - If MCP unavailable: Falls back to cached knowledge with warnings in ResearchResult.warnings
+    - Check ResearchResult.data_quality field: "full" | "partial" | "fallback"
+
+    **Error Handling:**
+    - 503: Claude AI not configured (ANTHROPIC_API_KEY missing)
+    - 500: MCP integration failure (research continues with reduced quality)
+    - Check ResearchResult.mcp_used to see if MCP was successfully used
     """
     user_id = user_data.get("sub")
+    request_id = getattr(request.state, "request_id", "unknown")
 
     # Check if Claude AI is available
     if not research_service.claude.is_available():
@@ -120,22 +176,22 @@ async def start_research(
             detail="Claude AI not configured. Please set ANTHROPIC_API_KEY in .env"
         )
 
-    logger.info(f"Starting research job for user {user_id}: {request.topic}")
+    logger.info(f"[{request_id}] Starting research job for user {user_id}: {research_request.topic}")
 
     # Create job in database
     job_id = str(uuid.uuid4())
     job = ResearchJob(
         id=job_id,
         user_id=user_id,
-        topic=request.topic,
-        target_duration_minutes=request.target_duration_minutes,
-        num_guests=request.num_guests,
-        include_youtube=request.include_youtube,
-        include_podcasts=request.include_podcasts,
-        include_scientific=request.include_scientific,
-        include_listener_topics=request.include_listener_topics,
-        spontaneous_deviations=request.spontaneous_deviations,
-        randomness_level=request.randomness_level,
+        topic=research_request.topic,
+        target_duration_minutes=research_request.target_duration_minutes,
+        num_guests=research_request.num_guests,
+        include_youtube=research_request.include_youtube,
+        include_podcasts=research_request.include_podcasts,
+        include_scientific=research_request.include_scientific,
+        include_listener_topics=research_request.include_listener_topics,
+        spontaneous_deviations=research_request.spontaneous_deviations,
+        randomness_level=research_request.randomness_level,
         status=ResearchStatus.PENDING,
         progress_percent=0.0,
         current_step="Initializing"
@@ -146,12 +202,12 @@ async def start_research(
     db.refresh(job)
 
     # Start background task
-    background_tasks.add_task(execute_research_job, job_id, request, db)
+    background_tasks.add_task(execute_research_job, job_id, research_request, db)
 
     return ResearchJobResponse(
         job_id=job_id,
         status=ResearchStatus.PENDING,
-        topic=request.topic,
+        topic=research_request.topic,
         research_completed=False,
         research_result=None,
         variants=[],

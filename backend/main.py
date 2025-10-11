@@ -9,6 +9,7 @@ Quality: 12/10 - Production Ready
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 import logging
@@ -18,6 +19,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import shutil
 import subprocess
+import uuid
 
 # Configure Logging
 logging.basicConfig(
@@ -25,6 +27,30 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# ============================================
+# Request ID Middleware
+# ============================================
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to add unique request IDs to every request
+    for distributed tracing and debugging
+    """
+    async def dispatch(self, request: Request, call_next):
+        # Extract or generate request ID
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+
+        # Add to request state for access in endpoints
+        request.state.request_id = request_id
+
+        # Process request
+        response = await call_next(request)
+
+        # Add request ID to response headers
+        response.headers["X-Request-ID"] = request_id
+
+        return response
 
 # ============================================
 # Application Lifespan
@@ -175,8 +201,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["X-Request-ID"],  # Expose request ID to frontend
 )
+
+# Add Request ID Middleware
+app.add_middleware(RequestIDMiddleware)
 
 # ============================================
 # Health Check Endpoint

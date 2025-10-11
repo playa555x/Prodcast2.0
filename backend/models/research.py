@@ -98,6 +98,11 @@ class ResearchResult(BaseModel):
     suggested_structure: List[str]  # Empfohlene Podcast-Struktur
     estimated_quality_score: float = Field(ge=0.0, le=10.0)
 
+    # Quality indicators
+    data_quality: str = Field(default="full", description="full | partial | fallback")
+    warnings: List[str] = Field(default_factory=list, description="Data quality warnings")
+    mcp_used: bool = Field(default=False, description="Whether MCP was used for research")
+
 class ScriptVariant(BaseModel):
     """One script variant for specific audience"""
     audience: AudienceType
