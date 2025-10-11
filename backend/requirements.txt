@@ -79,8 +79,8 @@ black==24.1.1
 # For API documentation enhancements (optional)
 # markdown==3.5.2
 
-# For request rate limiting (optional but recommended for production)
-# slowapi==0.1.9
+# For request rate limiting (REQUIRED for production)
+slowapi==0.1.9
 
 # ============================================
 # NOTES:
