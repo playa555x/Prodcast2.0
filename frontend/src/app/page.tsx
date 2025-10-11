@@ -155,14 +155,6 @@ export default function HomePage() {
           </Button>
         </form>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg text-center">
-          <p className="text-xs text-gray-600 mb-1">Admin Credentials:</p>
-          <p className="text-sm font-mono text-gray-800">
-            username: <span className="font-bold">admin</span> / password: <span className="font-bold">Mallman12</span>
-          </p>
-        </div>
-
         {/* Switch Mode Link */}
         <div className="mt-4 text-center">
           <button
