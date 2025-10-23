@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Textarea, ErrorAlert, DashboardNavbar } from '@/components'
 import { podcastService } from '@/lib/podcast.service'
@@ -48,34 +48,34 @@ export default function PodcastPage() {
   ]
 
   // Load voices when provider or filters change
-  useEffect(() => {
-    const loadVoices = async () => {
-      setLoadingVoices(true)
+  const loadVoices = useCallback(async () => {
+    setLoadingVoices(true)
 
-      // Build filters (only for ElevenLabs)
-      const filters = provider === TTSProvider.ELEVENLABS ? {
-        language: languageFilter || undefined,
-        gender: genderFilter || undefined
-      } : undefined
+    // Build filters (only for ElevenLabs)
+    const filters = provider === TTSProvider.ELEVENLABS ? {
+      language: languageFilter || undefined,
+      gender: genderFilter || undefined
+    } : undefined
 
-      const result = await ttsService.getVoices(provider, filters)
+    const result = await ttsService.getVoices(provider, filters)
 
-      if (result.ok && result.value) {
-        setAvailableVoices(result.value)
-        if (result.value.length > 0 && result.value[0]) {
-          setVoice(result.value[0].id)
-        }
-      } else {
-        setAvailableVoices([])
-        const fallbackVoice = VOICE_MAPPINGS[provider]?.[0]
-        if (fallbackVoice) setVoice(fallbackVoice)
+    if (result.ok && result.value) {
+      setAvailableVoices(result.value)
+      if (result.value.length > 0 && result.value[0]) {
+        setVoice(result.value[0].id)
       }
-
-      setLoadingVoices(false)
+    } else {
+      setAvailableVoices([])
+      const fallbackVoice = VOICE_MAPPINGS[provider]?.[0]
+      if (fallbackVoice) setVoice(fallbackVoice)
     }
 
-    loadVoices()
+    setLoadingVoices(false)
   }, [provider, languageFilter, genderFilter])
+
+  useEffect(() => {
+    loadVoices()
+  }, [loadVoices])
 
   const handleProviderChange = (newProvider: string) => {
     const providerEnum = newProvider as TTSProvider

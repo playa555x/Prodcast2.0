@@ -22,6 +22,10 @@ from services.speechify_tts import SpeechifyTTSService
 from services.google_tts import GoogleTTSService
 from services.microsoft_tts import MicrosoftTTSService
 from services.elevenlabs_tts import ElevenLabsTTSService
+from services.amazon_polly_wrapper import AmazonPollyWrapper
+from services.chatterbox_wrapper import ChatterboxWrapper
+from services.xtts_v2_wrapper import XTTSV2Wrapper
+from services.kokoro_wrapper import KokoroWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,12 @@ speechify_tts = SpeechifyTTSService()
 google_tts = GoogleTTSService()
 microsoft_tts = MicrosoftTTSService()
 elevenlabs_tts = ElevenLabsTTSService()
+
+# New TTS providers
+amazon_polly_tts = AmazonPollyWrapper()
+chatterbox_tts = ChatterboxWrapper()
+xtts_v2_tts = XTTSV2Wrapper()
+kokoro_tts = KokoroWrapper()
 
 # ============================================
 # TTS Endpoints
@@ -162,6 +172,71 @@ async def get_providers():
             max_characters=5000
         ))
 
+    # Amazon Polly
+    if amazon_polly_tts.is_available():
+        voices = amazon_polly_tts.get_voices()
+        providers.append(ProviderInfo(
+            provider=TTSProvider.AMAZON_POLLY,
+            name="Amazon Polly Neural",
+            available=True,
+            voices=voices,
+            cost_per_character=0.000016,
+            max_characters=100000
+        ))
+    else:
+        providers.append(ProviderInfo(
+            provider=TTSProvider.AMAZON_POLLY,
+            name="Amazon Polly (Demo)",
+            available=False,
+            voices=[
+                VoiceInfo(
+                    id="vicki-demo",
+                    name="Vicki (Demo)",
+                    language="de-DE",
+                    gender="female",
+                    description="Demo voice - Configure AWS credentials"
+                )
+            ],
+            cost_per_character=0.000016,
+            max_characters=100000
+        ))
+
+    # Chatterbox (FREE, better than ElevenLabs!)
+    if chatterbox_tts.is_available():
+        voices = chatterbox_tts.get_voices()
+        providers.append(ProviderInfo(
+            provider=TTSProvider.CHATTERBOX,
+            name="Chatterbox (FREE - Better than ElevenLabs)",
+            available=True,
+            voices=voices,
+            cost_per_character=0.0,
+            max_characters=100000
+        ))
+
+    # XTTS-v2 (Voice Cloning, FREE)
+    if xtts_v2_tts.is_available():
+        voices = xtts_v2_tts.get_voices()
+        providers.append(ProviderInfo(
+            provider=TTSProvider.XTTS_V2,
+            name="XTTS-v2 Voice Cloning (FREE)",
+            available=True,
+            voices=voices,
+            cost_per_character=0.0,
+            max_characters=100000
+        ))
+
+    # Kokoro (Ultra-fast, FREE)
+    if kokoro_tts.is_available():
+        voices = kokoro_tts.get_voices()
+        providers.append(ProviderInfo(
+            provider=TTSProvider.KOKORO,
+            name="Kokoro Ultra-Fast (FREE, <150ms)",
+            available=True,
+            voices=voices,
+            cost_per_character=0.0,
+            max_characters=100000
+        ))
+
     # Always return at least demo providers for development
     return providers
 
@@ -269,6 +344,51 @@ async def get_voices(
                 "alternatives": ["Try ElevenLabs", "Try OpenAI TTS", "Configure Speechify API key"]
             }
 
+    elif provider == TTSProvider.AMAZON_POLLY:
+        # Amazon Polly (Neural TTS)
+        if amazon_polly_tts.is_available():
+            voices = amazon_polly_tts.get_voices()
+        else:
+            error_details = {
+                "provider": "Amazon Polly",
+                "error": "AWS credentials not configured",
+                "api_configured": False,
+                "alternatives": ["Try Chatterbox (FREE)", "Try Google TTS", "Configure AWS credentials"]
+            }
+
+    elif provider == TTSProvider.CHATTERBOX:
+        # Chatterbox (FREE, better than ElevenLabs!)
+        voices = chatterbox_tts.get_voices()
+        if not voices:
+            error_details = {
+                "provider": "Chatterbox",
+                "error": "Service temporarily unavailable",
+                "api_configured": True,
+                "alternatives": ["Try XTTS-v2", "Try Kokoro", "Try ElevenLabs"]
+            }
+
+    elif provider == TTSProvider.XTTS_V2:
+        # XTTS-v2 (Voice Cloning, FREE)
+        voices = xtts_v2_tts.get_voices()
+        if not voices:
+            error_details = {
+                "provider": "XTTS-v2",
+                "error": "Service temporarily unavailable",
+                "api_configured": True,
+                "alternatives": ["Try Chatterbox", "Try Kokoro", "Try ElevenLabs"]
+            }
+
+    elif provider == TTSProvider.KOKORO:
+        # Kokoro (Ultra-fast, FREE)
+        voices = kokoro_tts.get_voices()
+        if not voices:
+            error_details = {
+                "provider": "Kokoro",
+                "error": "Service temporarily unavailable",
+                "api_configured": True,
+                "alternatives": ["Try Chatterbox", "Try XTTS-v2", "Try Google TTS"]
+            }
+
     else:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
@@ -330,7 +450,24 @@ async def generate_audio(
         if not elevenlabs_tts.is_available():
             raise HTTPException(status_code=503, detail="ElevenLabs not configured")
         service = elevenlabs_tts
-    
+
+    elif request.provider == TTSProvider.AMAZON_POLLY:
+        if not amazon_polly_tts.is_available():
+            raise HTTPException(status_code=503, detail="Amazon Polly not configured - Add AWS credentials")
+        service = amazon_polly_tts
+
+    elif request.provider == TTSProvider.CHATTERBOX:
+        # Chatterbox is always available (FREE!)
+        service = chatterbox_tts
+
+    elif request.provider == TTSProvider.XTTS_V2:
+        # XTTS-v2 is always available (FREE!)
+        service = xtts_v2_tts
+
+    elif request.provider == TTSProvider.KOKORO:
+        # Kokoro is always available (FREE!)
+        service = kokoro_tts
+
     else:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {request.provider}")
     
@@ -398,4 +535,4 @@ async def download_audio(audio_id: str):
             "Content-Disposition": f"attachment; filename={audio_id}.mp3"
         }
     )
-# Reload trigger - Microsoft Edge TTS integrated
+# Reload trigger - All 9 TTS providers integrated (OpenAI, Speechify, Google, Microsoft, ElevenLabs, Amazon Polly, Chatterbox, XTTS-v2, Kokoro)

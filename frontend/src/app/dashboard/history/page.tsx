@@ -16,7 +16,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, ErrorAlert, LoadingSpinner, DashboardNavbar } from '@/components'
 import type { HistoryEntry } from '@/types'
@@ -41,35 +41,35 @@ export default function HistoryPage() {
   const [copied, setCopied] = useState(false)
 
   // Load podcasts
-  useEffect(() => {
-    const loadPodcasts = async () => {
-      setLoading(true)
-      setError('')
+  const loadPodcasts = useCallback(async () => {
+    setLoading(true)
+    setError('')
 
-      try {
-        // TODO: Implement backend endpoint /api/history/list
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/production/history`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to load podcast history')
+    try {
+      // TODO: Implement backend endpoint /api/history/list
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/production/history`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
+      })
 
-        const data = await response.json()
-        setPodcasts(data.podcasts || [])
-        setFilteredPodcasts(data.podcasts || [])
-        setLoading(false)
-      } catch (e: any) {
-        setError(e.message || 'Failed to load podcast history')
-        setLoading(false)
+      if (!response.ok) {
+        throw new Error('Failed to load podcast history')
       }
-    }
 
-    loadPodcasts()
+      const data = await response.json()
+      setPodcasts(data.podcasts || [])
+      setFilteredPodcasts(data.podcasts || [])
+      setLoading(false)
+    } catch (e: any) {
+      setError(e.message || 'Failed to load podcast history')
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    loadPodcasts()
+  }, [loadPodcasts])
 
   // Apply filters
   useEffect(() => {

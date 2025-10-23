@@ -9,59 +9,53 @@ from typing import Dict, Any, Optional
 
 from core.database import get_db
 from core.security import get_current_user_id
-from models.user import User
+from core.config import settings
+from models.user import User, UsageStats, UserRole
 
 router = APIRouter(tags=["Users"])
 
 @router.get("/stats")
 async def get_user_stats(
-    db: Session = Depends(get_db),
-    user_id: Optional[str] = None
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get user statistics
 
-    Optional authentication - returns guest stats if not authenticated
+    Requires authentication - returns current user's stats
 
     Returns:
         User stats including usage, limits, costs
     """
-    # If no user_id provided, return guest/demo stats
-    if not user_id:
-        return {
-            "userId": "guest",
-            "totalCharactersUsed": 0,
-            "totalAudioGenerated": 0,
-            "totalCostUsd": 0,
-            "monthlyCharactersUsed": 0,
-            "monthlyLimit": 10000,
-            "remainingCharacters": 10000,
-            "isGuest": True
-        }
-
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        return {
-            "userId": user_id,
-            "totalCharactersUsed": 0,
-            "totalAudioGenerated": 0,
-            "totalCostUsd": 0,
-            "monthlyCharactersUsed": 0,
-            "monthlyLimit": 10000,
-            "remainingCharacters": 10000,
-            "isGuest": False
-        }
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # TODO: Calculate real stats from usage logs
+    # Get or create usage stats
+    stats = db.query(UsageStats).filter(UsageStats.user_id == user_id).first()
+    if not stats:
+        stats = UsageStats(user_id=user_id)
+        db.add(stats)
+        db.commit()
+        db.refresh(stats)
+
+    # Determine monthly limit based on role
+    if user.role == UserRole.ADMIN:
+        monthly_limit = settings.LIMIT_ADMIN_MONTHLY
+    elif user.role == UserRole.PAID:
+        monthly_limit = settings.LIMIT_PAID_MONTHLY
+    else:
+        monthly_limit = settings.LIMIT_FREE_MONTHLY
+
     return {
         "userId": user.id,
-        "totalCharactersUsed": 0,
-        "totalAudioGenerated": 0,
-        "totalCostUsd": 0,
-        "monthlyCharactersUsed": 0,
-        "monthlyLimit": 10000 if user.role.value == "free" else 100000,
-        "remainingCharacters": 10000 if user.role.value == "free" else 100000,
+        "totalCharactersUsed": stats.total_characters_used,
+        "totalAudioGenerated": stats.total_audio_generated,
+        "totalCostUsd": stats.total_cost_usd,
+        "monthlyCharactersUsed": stats.monthly_characters_used,
+        "monthlyLimit": monthly_limit,
+        "remainingCharacters": max(0, monthly_limit - stats.monthly_characters_used),
         "isGuest": False
     }
 

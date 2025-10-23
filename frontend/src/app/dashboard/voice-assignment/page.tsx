@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button, Card, ErrorAlert, SuccessAlert, LoadingSpinner, DashboardNavbar } from '@/components'
 import { researchService } from '@/lib/research.service'
@@ -60,54 +60,54 @@ function VoiceAssignmentContent() {
   ]
 
   // Load research results
-  useEffect(() => {
-    const loadResearch = async () => {
-      if (!jobId) {
-        setError('No research job ID provided')
+  const loadResearch = useCallback(async () => {
+    if (!jobId) {
+      setError('No research job ID provided')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const result = await researchService.getResult(jobId)
+
+      if (!result.ok) {
+        setError(result.error.detail)
         setLoading(false)
         return
       }
 
-      try {
-        const result = await researchService.getResult(jobId)
+      // Get selected variant
+      const selectedVariant = result.value.variants.find(
+        (v) => v.audience === variant
+      )
 
-        if (!result.ok) {
-          setError(result.error.detail)
-          setLoading(false)
-          return
-        }
-
-        // Get selected variant
-        const selectedVariant = result.value.variants.find(
-          (v) => v.audience === variant
-        )
-
-        if (!selectedVariant) {
-          setError(`Variant '${variant}' not found`)
-          setLoading(false)
-          return
-        }
-
-        // Extract characters
-        const chars = selectedVariant.characters || []
-        setCharacters(chars)
-
-        // Initialize providers (default: OpenAI)
-        const initProviders: Record<string, string> = {}
-        chars.forEach((c) => {
-          initProviders[c.id] = TTSProvider.OPENAI
-        })
-        setSelectedProviders(initProviders)
-
+      if (!selectedVariant) {
+        setError(`Variant '${variant}' not found`)
         setLoading(false)
-      } catch (e: any) {
-        setError(e.message || 'Failed to load research results')
-        setLoading(false)
+        return
       }
-    }
 
-    loadResearch()
+      // Extract characters
+      const chars = selectedVariant.characters || []
+      setCharacters(chars)
+
+      // Initialize providers (default: OpenAI)
+      const initProviders: Record<string, string> = {}
+      chars.forEach((c) => {
+        initProviders[c.id] = TTSProvider.OPENAI
+      })
+      setSelectedProviders(initProviders)
+
+      setLoading(false)
+    } catch (e: any) {
+      setError(e.message || 'Failed to load research results')
+      setLoading(false)
+    }
   }, [jobId, variant])
+
+  useEffect(() => {
+    loadResearch()
+  }, [loadResearch])
 
   // Load voices when provider changes
   const loadVoicesForCharacter = async (characterId: string, provider: string) => {

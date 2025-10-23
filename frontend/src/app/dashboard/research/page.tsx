@@ -51,6 +51,7 @@ export default function ResearchPage() {
   const [result, setResult] = useState<ResearchJobResponse | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [successShown, setSuccessShown] = useState(false)
 
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -77,6 +78,7 @@ export default function ResearchPage() {
 
     setError('')
     setSuccess('')
+    setSuccessShown(false)
     setLoading(true)
     setResult(null)
 
@@ -84,6 +86,7 @@ export default function ResearchPage() {
 
     if (res.ok) {
       setSuccess('Research job started! This may take 2-5 minutes.')
+      setSuccessShown(true)
       pollStatus(res.value.job_id)
     } else {
       setError(res.error.detail)
@@ -112,7 +115,10 @@ export default function ResearchPage() {
           const resultRes = await researchService.getResult(jId)
           if (resultRes.ok) {
             setResult(resultRes.value)
-            setSuccess('✅ Research completed! Check results below.')
+            if (!successShown) {
+              setSuccess('✅ Research completed! Check results below.')
+              setSuccessShown(true)
+            }
           }
 
           setLoading(false)

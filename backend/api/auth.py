@@ -59,8 +59,8 @@ class UserResponse(BaseModel):
 # ============================================
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("5/minute")  # Max 5 login attempts per minute per IP
-async def login(http_request: Request, request: LoginRequest, db: Session = Depends(get_db)):
+# @limiter.limit("5/minute")  # DISABLED - causing slowapi error
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with username and password
     

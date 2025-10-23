@@ -19,6 +19,10 @@ class TTSProvider(str, Enum):
     GOOGLE = "google"
     MICROSOFT = "microsoft"
     ELEVENLABS = "elevenlabs"
+    AMAZON_POLLY = "amazon_polly"
+    CHATTERBOX = "chatterbox"
+    XTTS_V2 = "xtts_v2"
+    KOKORO = "kokoro"
 
 class AudioFormat(str, Enum):
     """Audio output formats"""

@@ -15,7 +15,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button, Card, ErrorAlert, SuccessAlert, LoadingSpinner, DashboardNavbar } from '@/components'
 import { productionService } from '@/lib/production.service'
@@ -61,33 +61,33 @@ function TimelineEditorContent() {
   const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null)
 
   // Load timeline
-  useEffect(() => {
-    const loadTimeline = async () => {
-      if (!jobId) {
-        setError('No production job ID provided')
+  const loadTimeline = useCallback(async () => {
+    if (!jobId) {
+      setError('No production job ID provided')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const result = await productionService.getTimeline(jobId)
+
+      if (!result.ok) {
+        setError(result.error.detail)
         setLoading(false)
         return
       }
 
-      try {
-        const result = await productionService.getTimeline(jobId)
-
-        if (!result.ok) {
-          setError(result.error.detail)
-          setLoading(false)
-          return
-        }
-
-        setTimeline(result.value)
-        setLoading(false)
-      } catch (e: any) {
-        setError(e.message || 'Failed to load timeline')
-        setLoading(false)
-      }
+      setTimeline(result.value)
+      setLoading(false)
+    } catch (e: any) {
+      setError(e.message || 'Failed to load timeline')
+      setLoading(false)
     }
-
-    loadTimeline()
   }, [jobId])
+
+  useEffect(() => {
+    loadTimeline()
+  }, [loadTimeline])
 
   // Open edit modal
   const openEditModal = async (segment: AudioSegment) => {

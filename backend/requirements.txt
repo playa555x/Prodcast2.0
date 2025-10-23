@@ -1,7 +1,7 @@
 # ============================================
 # GedaechtnisBoost Premium - Backend Dependencies
 # Production-Ready FastAPI Application
-# Last Updated: 2025-10-06
+# Last Updated: 2025-10-21
 # ============================================
 
 # ============================================
@@ -60,6 +60,12 @@ gtts==2.5.1
 edge-tts==6.1.9
 openai==1.12.0
 elevenlabs==0.2.27
+
+# Huggingface TTS Integration (NEW)
+# For Chatterbox, XTTS-v2, Kokoro-82M models
+# httpx already included above (0.27.2)
+# pydantic already included above (2.5.3)
+huggingface-hub==0.20.3  # For model downloads and API access
 
 # ============================================
 # Environment Variables

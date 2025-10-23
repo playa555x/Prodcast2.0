@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Button, LoadingSpinner, DashboardNavbar } from '@/components'
 import { useAuth } from '@/hooks'
@@ -90,17 +90,11 @@ export default function AccountPage() {
     }
   }, [isAuthenticated, authLoading, router])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadData()
-    }
-  }, [isAuthenticated, activeTab])
-
   // ============================================
   // Functions
   // ============================================
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('auth_token')
@@ -135,7 +129,13 @@ export default function AccountPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData()
+    }
+  }, [isAuthenticated, loadData])
 
   if (authLoading) {
     return (

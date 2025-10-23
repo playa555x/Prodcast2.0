@@ -65,6 +65,29 @@ class Settings(BaseSettings):
     # ElevenLabs
     ELEVENLABS_API_KEY: Optional[str] = None
 
+    # Amazon Polly
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_REGION: str = "eu-central-1"
+
+    # Huggingface (for Chatterbox, XTTS-v2, Kokoro)
+    HUGGINGFACE_TOKEN: Optional[str] = None
+
+    # ============================================
+    # Audio Enhancement (Adobe Podcast)
+    # ============================================
+
+    # Adobe Account 1 (can add more: ADOBE_EMAIL_2, etc.)
+    ADOBE_EMAIL_1: Optional[str] = None
+    ADOBE_PASSWORD_1: Optional[str] = None
+    ADOBE_TIER_1: str = "free"  # "free" or "premium"
+
+    # Enhancement Settings
+    ENHANCEMENT_ENABLED: bool = True
+    ENHANCEMENT_DEFAULT_QUALITY: str = "medium"  # "low", "medium", "high"
+    ENHANCEMENT_CACHE_ENABLED: bool = True
+    ENHANCEMENT_MAX_CONCURRENT: int = 2
+
     # ============================================
     # AI Research & Content Generation
     # ============================================
@@ -106,6 +129,11 @@ class Settings(BaseSettings):
     COST_GOOGLE_STANDARD: float = 0.000004
     COST_GOOGLE_WAVENET: float = 0.000016
     COST_ELEVENLABS: float = 0.00003
+    COST_AMAZON_POLLY_NEURAL: float = 0.000016
+    COST_AMAZON_POLLY_STANDARD: float = 0.000004
+    COST_CHATTERBOX: float = 0.0  # Free Huggingface
+    COST_XTTS_V2: float = 0.0  # Free Huggingface
+    COST_KOKORO: float = 0.0  # Free Huggingface
     
     # ============================================
     # File Storage

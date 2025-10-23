@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, LoadingSpinner, DashboardNavbar } from '@/components'
 import { useAuth } from '@/hooks'
@@ -59,17 +59,11 @@ export default function AdminUsersPage() {
     }
   }, [isAuthenticated, authLoading, user, router])
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadUsers()
-    }
-  }, [user])
-
   // ============================================
   // Functions
   // ============================================
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`, {
@@ -89,7 +83,13 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadUsers()
+    }
+  }, [user, loadUsers])
 
   if (authLoading || loading) {
     return (
@@ -229,7 +229,7 @@ function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('user')
+  const [role, setRole] = useState('free')
   const [plan, setPlan] = useState('free')
   const [limit, setLimit] = useState(10000)
   const [creating, setCreating] = useState(false)
@@ -265,7 +265,19 @@ function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
         onSuccess()
       } else {
         const data = await response.json()
-        setError(data.detail || 'Failed to create user')
+
+        // Handle Pydantic validation errors (array of error objects)
+        if (Array.isArray(data.detail)) {
+          const errorMessages = data.detail.map((err: any) => {
+            const field = err.loc?.join('.') || 'unknown'
+            return `${field}: ${err.msg}`
+          }).join(', ')
+          setError(errorMessages)
+        } else if (typeof data.detail === 'string') {
+          setError(data.detail)
+        } else {
+          setError('Failed to create user')
+        }
       }
     } catch (e) {
       setError('Error creating user')
@@ -338,7 +350,8 @@ function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-4 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none"
               >
-                <option value="user">User</option>
+                <option value="free">Free</option>
+                <option value="paid">Paid</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -371,7 +384,10 @@ function CreateUserModal({ onClose, onSuccess }: CreateUserModalProps) {
             <input
               type="number"
               value={limit}
-              onChange={(e) => setLimit(parseInt(e.target.value))}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10)
+                setLimit(isNaN(value) ? 0 : value)
+              }}
               className="w-full px-4 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg focus:border-indigo-500 dark:focus:border-indigo-400 focus:outline-none"
             />
           </div>

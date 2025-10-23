@@ -253,6 +253,7 @@ async def health_check():
 from api.auth import router as auth_router
 from api.tts import router as tts_router
 from api.podcast import router as podcast_router
+from api.podcast_generator import router as podcast_generator_router  # NEU: Emotionaler Podcast-Generator
 from api.research import router as research_router
 from api.production import router as production_router
 from api.users import router as users_router
@@ -271,11 +272,12 @@ app.include_router(account_router, prefix="/api", tags=["Account"])
 app.include_router(trending_router, prefix="/api", tags=["Trending Topics"])
 app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
 app.include_router(podcast_router, prefix="/api/podcast", tags=["Podcast"])
+app.include_router(podcast_generator_router, prefix="/api/podcast-generator", tags=["Emotional Podcast Generator"])  # NEU
 app.include_router(research_router, prefix="/api/research", tags=["AI Research"])
 app.include_router(production_router, prefix="/api/production", tags=["Production Pipeline"])
 app.include_router(ai_studio_router, prefix="/api/ai-studio", tags=["AI Studio"])
 app.include_router(claude_script_router, prefix="/api/claude-script", tags=["Claude Script Generation"])
-app.include_router(users_router)
+app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(voice_library_router)
 
 # ============================================
@@ -339,3 +341,4 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+# Force reload - All 9 TTS providers integrated

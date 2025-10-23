@@ -14,7 +14,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, LoadingSpinner, DashboardNavbar } from '@/components'
 import { useAuth } from '@/hooks'
@@ -89,17 +89,11 @@ export default function AdminSettingsPage() {
     }
   }, [isAuthenticated, authLoading, user, router])
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadSettings()
-    }
-  }, [user])
-
   // ============================================
   // Functions
   // ============================================
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setLoading(true)
     try {
       // TODO: Load from backend
@@ -113,7 +107,13 @@ export default function AdminSettingsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadSettings()
+    }
+  }, [user, loadSettings])
 
   const handleSave = async () => {
     setSaving(true)
