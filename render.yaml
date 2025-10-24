@@ -1,49 +1,10 @@
 services:
-  # Backend - Python FastAPI
   - type: web
-    name: prodcast-backend
+    name: gedaechtnisboost-backend-new
     runtime: python
-    region: frankfurt
-    plan: free
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && python main.py
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
     envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: SECRET_KEY
-        generateValue: true
-      - key: CLAUDE_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: SPEECHIFY_API_KEY
-        sync: false
-      - key: GOOGLE_APPLICATION_CREDENTIALS
-        sync: false
       - key: PORT
-        value: 8001
-    healthCheckPath: /health
-
-  # Frontend - Next.js
-  - type: web
-    name: prodcast-frontend
-    runtime: node
-    region: frankfurt
-    plan: free
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npm start
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        value: https://prodcast-backend.onrender.com
-      - key: PORT
-        value: 3000
-    healthCheckPath: /
-
-# Database (PostgreSQL)
-databases:
-  - name: prodcast-db
-    databaseName: prodcast
-    plan: free
-    region: frankfurt
+        value: 8080
