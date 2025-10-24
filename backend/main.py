@@ -334,10 +334,13 @@ async def general_exception_handler(request, exc):
 # ============================================
 
 if __name__ == "__main__":
+    # Read PORT from environment (for Fly.io, Railway, etc.)
+    port = int(os.getenv("PORT", 8001))
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8001,
+        port=port,
         reload=True,
         log_level="info"
     )
