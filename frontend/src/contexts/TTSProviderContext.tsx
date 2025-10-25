@@ -42,12 +42,19 @@ export function TTSProviderProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
 
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tts/providers`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+        },
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         if (response.status === 503) {
@@ -64,8 +71,16 @@ export function TTSProviderProvider({ children }: { children: ReactNode }) {
       setProviders(data)
       console.log(`✅ Loaded ${data.length} TTS providers`)
     } catch (e: any) {
-      console.error('Failed to load TTS providers:', e)
-      setError(e.message)
+      clearTimeout(timeoutId)
+
+      // Handle different error types
+      if (e.name === 'AbortError') {
+        console.warn('⚠️ TTS providers request timed out - backend may be offline')
+        setError('Backend offline or slow to respond')
+      } else {
+        console.error('Failed to load TTS providers:', e)
+        setError(e.message || 'Failed to connect to backend')
+      }
       setProviders([])
     } finally {
       setLoading(false)

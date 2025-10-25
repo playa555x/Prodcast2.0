@@ -97,8 +97,8 @@ export const USER_LIMITS = {
 // Timeouts & Retries
 // ============================================
 
-export const REQUEST_TIMEOUT_MS = 30000 // 30 seconds
-export const REQUEST_RETRY_COUNT = 3
+export const REQUEST_TIMEOUT_MS = 10000 // 10 seconds (reduced from 30s for faster failure feedback)
+export const REQUEST_RETRY_COUNT = 2 // Reduced from 3 to minimize total wait time
 export const REQUEST_RETRY_DELAY_MS = 1000 // 1 second
 
 export const PODCAST_POLL_INTERVAL_MS = 3000 // 3 seconds

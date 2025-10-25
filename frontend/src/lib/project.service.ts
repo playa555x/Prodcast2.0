@@ -49,10 +49,16 @@ class ProjectService {
    * List all projects
    */
   async listProjects(): Promise<Result<ProjectListItem[]>> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
     try {
       const response = await fetch(`${this.baseUrl}/api/projects`, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -71,10 +77,14 @@ class ProjectService {
         value: data
       }
     } catch (error) {
+      clearTimeout(timeoutId)
+
       return {
         ok: false,
         error: {
-          detail: error instanceof Error ? error.message : 'Network error',
+          detail: error instanceof Error
+            ? (error.name === 'AbortError' ? 'Backend connection timeout' : error.message)
+            : 'Network error',
           status: 0
         } as any
       }
@@ -85,10 +95,16 @@ class ProjectService {
    * Get project by ID
    */
   async getProject(projectId: string): Promise<Result<ProjectMetadata>> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
     try {
       const response = await fetch(`${this.baseUrl}/api/projects/${projectId}`, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -107,10 +123,14 @@ class ProjectService {
         value: data
       }
     } catch (error) {
+      clearTimeout(timeoutId)
+
       return {
         ok: false,
         error: {
-          detail: error instanceof Error ? error.message : 'Network error',
+          detail: error instanceof Error
+            ? (error.name === 'AbortError' ? 'Backend connection timeout' : error.message)
+            : 'Network error',
           status: 0
         } as any
       }

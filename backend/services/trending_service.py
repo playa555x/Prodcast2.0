@@ -21,7 +21,8 @@ import asyncio
 from bs4 import BeautifulSoup
 import re
 
-from services.mcp_client import get_mcp_client
+# DISABLED: MCP integration removed for deployment
+# from services.mcp_client import get_mcp_client
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,9 @@ class TrendingService:
         """
         Get top news headlines via MCP Web Search
 
+        DISABLED: MCP integration removed for deployment
+        Returns empty list until re-enabled
+
         Args:
             country: Country code (de, us, gb, etc.)
             category: Category (business, technology, etc.)
@@ -126,52 +130,27 @@ class TrendingService:
         Returns:
             List of news headlines from MCP web search
         """
-        try:
-            mcp = await get_mcp_client()
+        logger.warning("MCP Web Search disabled - get_top_headlines returning empty list")
+        return []
 
-            # Build search query based on category and country
-            country_map = {
-                "de": "Deutschland Germany",
-                "us": "United States USA",
-                "gb": "United Kingdom UK",
-                "fr": "France",
-                "es": "Spain España",
-                "it": "Italy Italia",
-                "jp": "Japan 日本",
-                "br": "Brazil Brasil",
-                "in": "India",
-                "au": "Australia",
-                "ca": "Canada",
-                "mx": "Mexico"
-            }
-
-            country_name = country_map.get(country.lower(), country)
-
-            if category:
-                query = f"breaking {category} news {country_name} today"
-            else:
-                query = f"breaking news {country_name} today headlines"
-
-            results = await mcp.search_web(query=query, max_results=limit * 2)
-
-            headlines = []
-            for idx, result in enumerate(results[:limit]):
-                headlines.append({
-                    "rank": idx + 1,
-                    "title": result.get("title", ""),
-                    "description": result.get("description", ""),
-                    "source": "MCP Web Search",
-                    "url": result.get("url", ""),
-                    "publishedAt": result.get("publishedDate", datetime.utcnow().isoformat()),
-                    "category": category or "general"
-                })
-
-            logger.info(f"Fetched {len(headlines)} headlines via MCP Web Search")
-            return headlines
-
-        except Exception as e:
-            logger.error(f"Failed to fetch headlines via MCP: {e}")
-            return []
+        # DISABLED CODE - MCP removed for deployment
+        # try:
+        #     mcp = await get_mcp_client()
+        #     country_map = {...}
+        #     country_name = country_map.get(country.lower(), country)
+        #     if category:
+        #         query = f"breaking {category} news {country_name} today"
+        #     else:
+        #         query = f"breaking news {country_name} today headlines"
+        #     results = await mcp.search_web(query=query, max_results=limit * 2)
+        #     headlines = []
+        #     for idx, result in enumerate(results[:limit]):
+        #         headlines.append({...})
+        #     logger.info(f"Fetched {len(headlines)} headlines via MCP Web Search")
+        #     return headlines
+        # except Exception as e:
+        #     logger.error(f"Failed to fetch headlines via MCP: {e}")
+        #     return []
 
     # ============================================
     # Reddit API

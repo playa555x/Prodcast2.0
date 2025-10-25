@@ -3,7 +3,8 @@
   publish = ".next"
 
 [build.environment]
-  NEXT_PUBLIC_API_URL = "https://prodcast2-0-3.onrender.com"
+  # Production backend URL (Fly.io - NO COLD START!)
+  NEXT_PUBLIC_API_URL = "https://gedaechtnisboost-backend.fly.dev"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
