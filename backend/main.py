@@ -20,6 +20,7 @@ from slowapi.errors import RateLimitExceeded
 import shutil
 import subprocess
 import uuid
+import os
 
 # Configure Logging
 logging.basicConfig(
@@ -133,32 +134,34 @@ async def lifespan(app: FastAPI):
         logger.error("Server will not start. Fix database connection and try again.")
         raise  # Stop server startup
 
+    # DISABLED: MCP integration removed for deployment
     # Initialize MCP if enabled
-    from core.config import settings
-    if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
-        logger.info("🔌 MCP enabled - initializing client...")
-        try:
-            from services.mcp_client import get_mcp_client
-            await get_mcp_client()
-            logger.info("✅ MCP client initialized")
-        except Exception as e:
-            logger.warning(f"⚠️ MCP initialization failed: {e}")
-            logger.warning("MCP features will use fallback methods")
+    # from core.config import settings
+    # if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
+    #     logger.info("🔌 MCP enabled - initializing client...")
+    #     try:
+    #         from services.mcp_client import get_mcp_client
+    #         await get_mcp_client()
+    #         logger.info("✅ MCP client initialized")
+    #     except Exception as e:
+    #         logger.warning(f"⚠️ MCP initialization failed: {e}")
+    #         logger.warning("MCP features will use fallback methods")
 
     yield
 
     # Shutdown
     logger.info("👋 Shutting down GedächtnisBoost Premium API...")
 
+    # DISABLED: MCP integration removed for deployment
     # Close MCP client
-    if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
-        logger.info("Closing MCP connections...")
-        try:
-            from services.mcp_client import close_mcp_client
-            await close_mcp_client()
-            logger.info("✅ MCP connections closed")
-        except Exception as e:
-            logger.error(f"Error closing MCP: {e}")
+    # if settings.MCP_YOUTUBE_ENABLED or settings.MCP_WEB_SCRAPING_ENABLED:
+    #     logger.info("Closing MCP connections...")
+    #     try:
+    #         from services.mcp_client import close_mcp_client
+    #         await close_mcp_client()
+    #         logger.info("✅ MCP connections closed")
+    #     except Exception as e:
+    #         logger.error(f"Error closing MCP: {e}")
 
 # ============================================
 # FastAPI Application
@@ -254,7 +257,7 @@ from api.auth import router as auth_router
 from api.tts import router as tts_router
 from api.podcast import router as podcast_router
 from api.podcast_generator import router as podcast_generator_router  # NEU: Emotionaler Podcast-Generator
-from api.research import router as research_router
+# from api.research import router as research_router  # DISABLED: Requires MCP
 from api.production import router as production_router
 from api.users import router as users_router
 from api.voice_library import router as voice_library_router
@@ -273,7 +276,7 @@ app.include_router(trending_router, prefix="/api", tags=["Trending Topics"])
 app.include_router(tts_router, prefix="/api/tts", tags=["TTS"])
 app.include_router(podcast_router, prefix="/api/podcast", tags=["Podcast"])
 app.include_router(podcast_generator_router, prefix="/api/podcast-generator", tags=["Emotional Podcast Generator"])  # NEU
-app.include_router(research_router, prefix="/api/research", tags=["AI Research"])
+# app.include_router(research_router, prefix="/api/research", tags=["AI Research"])  # DISABLED: Requires MCP
 app.include_router(production_router, prefix="/api/production", tags=["Production Pipeline"])
 app.include_router(ai_studio_router, prefix="/api/ai-studio", tags=["AI Studio"])
 app.include_router(claude_script_router, prefix="/api/claude-script", tags=["Claude Script Generation"])

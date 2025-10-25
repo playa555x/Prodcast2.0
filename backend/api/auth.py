@@ -60,7 +60,7 @@ class UserResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit("5/minute")
-async def login(http_request: Request, request: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: Request, credentials: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with username and password
     
@@ -70,21 +70,21 @@ async def login(http_request: Request, request: LoginRequest, db: Session = Depe
     - Username: admin  
     - Password: Set via ADMIN_DEFAULT_PASSWORD env var (default: ChangeMeNow123!)
     """
-    logger.info(f"Login attempt for user: {request.username}")
-    
+    logger.info(f"Login attempt for user: {credentials.username}")
+
     # Get user from database
-    user = db.query(User).filter(User.username == request.username).first()
-    
+    user = db.query(User).filter(User.username == credentials.username).first()
+
     if not user:
-        logger.warning(f"User not found: {request.username}")
+        logger.warning(f"User not found: {credentials.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
         )
-    
+
     # Verify password with bcrypt
-    if not verify_password(request.password, user.password_hash):
-        logger.warning(f"Invalid password for user: {request.username}")
+    if not verify_password(credentials.password, user.password_hash):
+        logger.warning(f"Invalid password for user: {credentials.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -92,7 +92,7 @@ async def login(http_request: Request, request: LoginRequest, db: Session = Depe
     
     # Check if user is active
     if user.status != UserStatus.ACTIVE:
-        logger.warning(f"User account not active: {request.username}  ")
+        logger.warning(f"User account not active: {credentials.username}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is not active"
@@ -106,7 +106,7 @@ async def login(http_request: Request, request: LoginRequest, db: Session = Depe
     token_data = create_user_token_data(user)
     access_token = create_access_token(token_data)
 
-    logger.info(f"Login successful for user: {request.username}")
+    logger.info(f"Login successful for user: {credentials.username}")
 
     return LoginResponse(
         access_token=access_token,
