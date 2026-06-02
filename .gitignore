@@ -1,0 +1,33 @@
+# --- Python / Backend ---
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+backend/*.db
+backend/heartmatch*.db
+backend/generated_cache/
+.env
+.env.local
+
+# --- Unity ---
+unity-game/[Ll]ibrary/
+unity-game/[Tt]emp/
+unity-game/[Oo]bj/
+unity-game/[Bb]uild/
+unity-game/[Bb]uilds/
+unity-game/[Ll]ogs/
+unity-game/[Uu]ser[Ss]ettings/
+unity-game/[Mm]emoryCaptures/
+unity-game/.vs/
+unity-game/*.csproj
+unity-game/*.sln
+unity-game/*.unityproj
+unity-game/*.apk
+unity-game/*.aab
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
