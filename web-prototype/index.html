@@ -25,79 +25,118 @@
   .wallet b { color: var(--gold); }
   .app { width: 100%; max-width: 760px; padding: 0 16px 40px; }
   .card { background: var(--panel); border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
-  .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .col { flex: 1 1 320px; }
   h2 { margin: 0 0 12px; font-size: 18px; }
   .muted { color: var(--muted); font-size: 13px; }
 
-  /* Character panel */
   .char { display: flex; gap: 14px; align-items: center; }
   .portrait {
     width: 92px; height: 92px; border-radius: 14px; flex: none;
     background: linear-gradient(135deg, var(--accent2), var(--accent));
     display: flex; align-items: center; justify-content: center; font-size: 40px;
+    box-shadow: 0 6px 20px rgba(138,92,255,.4);
   }
   .bars { flex: 1; }
   .bar { margin: 6px 0; }
   .bar label { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
   .track { height: 9px; background: #392c52; border-radius: 6px; overflow: hidden; }
-  .fill { height: 100%; width: 0; transition: width .35s ease; }
+  .fill { height: 100%; width: 0; transition: width .45s cubic-bezier(.2,.8,.2,1); }
   .fill.aff { background: linear-gradient(90deg, #ff7eb3, var(--accent)); }
   .fill.trust { background: linear-gradient(90deg, #7ab8ff, #4f8cff); }
   .fill.mood { background: linear-gradient(90deg, #ffe08a, var(--gold)); }
   .tier { font-weight: 800; color: var(--accent); }
 
+  .bubble {
+    margin: 12px 0 0; background: var(--panel2); border-radius: 12px; padding: 10px 14px;
+    position: relative; font-style: italic; color: #e9e0fb;
+  }
+  .bubble:before { content: "💬"; margin-right: 6px; font-style: normal; }
+
   .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   button {
     background: var(--panel2); color: var(--text); border: 1px solid #3b2f55; border-radius: 10px;
-    padding: 9px 12px; font-size: 14px; cursor: pointer; transition: transform .08s, background .15s;
+    padding: 9px 12px; font-size: 14px; cursor: pointer; transition: transform .08s, background .15s, box-shadow .15s;
   }
   button:hover { background: #38294f; }
-  button:active { transform: scale(.96); }
+  button:active { transform: scale(.95); }
   button.primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); border: none; font-weight: 700; }
+  button.primary:hover { box-shadow: 0 4px 18px rgba(255,93,143,.5); }
   button:disabled { opacity: .4; cursor: not-allowed; }
 
-  /* Match-3 grid */
   #m3grid { display: grid; gap: 4px; margin: 0 auto; touch-action: manipulation; }
   .gem {
     width: 100%; aspect-ratio: 1; border-radius: 9px; display: flex; align-items: center; justify-content: center;
     font-size: 20px; cursor: pointer; user-select: none; transition: transform .1s, box-shadow .1s;
+    animation: pop .18s ease;
   }
+  @keyframes pop { from { transform: scale(.4); opacity: .3; } to { transform: scale(1); opacity: 1; } }
   .gem.sel { outline: 3px solid #fff; transform: scale(.9); }
   .gem.special { box-shadow: inset 0 0 0 3px rgba(255,255,255,.85); }
 
-  /* Ball sort */
   #tubes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 10px 0; }
   .tube {
     width: 46px; background: rgba(255,255,255,.06); border: 2px solid #4a3a68;
     border-top: none; border-radius: 0 0 22px 22px; display: flex; flex-direction: column-reverse;
     align-items: center; padding: 6px 0; cursor: pointer; gap: 6px;
   }
-  .tube.sel { border-color: #fff; }
-  .ball { width: 32px; height: 32px; border-radius: 50%; }
+  .tube.sel { border-color: #fff; box-shadow: 0 0 12px rgba(255,255,255,.3); }
+  .ball { width: 32px; height: 32px; border-radius: 50%; transition: transform .12s; }
+
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .rchar {
+    background: var(--panel2); border-radius: 12px; padding: 12px; text-align: center; cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .rchar.active { border-color: var(--accent); }
+  .rchar.locked { opacity: .5; cursor: not-allowed; }
+  .rface { font-size: 34px; }
 
   .gallery { display: flex; gap: 8px; flex-wrap: wrap; }
   .reward {
     width: 70px; height: 92px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    font-size: 11px; text-align: center; color: #fff; padding: 4px;
+    font-size: 11px; text-align: center; color: #fff; padding: 4px; position: relative;
     background: linear-gradient(160deg, var(--accent2), var(--accent));
   }
   .reward.locked { background: #2c2240; color: var(--muted); border: 1px dashed #4a3a68; }
+  .reward .new { position: absolute; top: -6px; right: -6px; background: var(--gold); color: #000;
+    font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 8px; }
   .hud { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: #2c2240; border: 1px solid var(--accent); padding: 10px 16px; border-radius: 12px;
-    opacity: 0; transition: opacity .3s; pointer-events: none; font-size: 14px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; font-size: 14px; z-index: 50;
   }
   .toast.show { opacity: 1; }
-  .tabbtns { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabbtns { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .hidden { display: none; }
   .policy { font-size: 11px; color: var(--muted); margin-top: 18px; text-align: center; }
+
+  /* Start / Age gate */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10,7,16,.92); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center;
+  }
+  .overlay .card { max-width: 420px; }
+  .overlay h1 { margin: 0 0 6px; } .overlay h1 span { color: var(--accent); }
+  .setrow { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #33284a; }
 </style>
 </head>
 <body>
+
+<!-- Start- / Age-Gate -->
+<div class="overlay" id="gate">
+  <div class="card">
+    <h1>Heart <span>&amp;</span> Match</h1>
+    <p class="muted">Wähle die Inhalts-Variante. (Demo: beide Varianten zeigen nur Platzhalter — ausschließlich fiktive, erwachsene Charaktere.)</p>
+    <div class="btns" style="justify-content:center;">
+      <button class="primary" onclick="enterGame('sfw')">🌸 SFW starten</button>
+      <button onclick="askAdult()">🔞 18+ Variante</button>
+    </div>
+    <p class="muted" id="ageNote" style="margin-top:14px;"></p>
+  </div>
+</div>
+
 <header>
-  <div class="brand">Heart <span>&amp;</span> Match <span class="muted" style="font-size:11px;">Prototyp</span></div>
+  <div class="brand">Heart <span>&amp;</span> Match <span class="muted" style="font-size:11px;" id="tierBadge">SFW</span></div>
   <div class="wallet">
     <div>🪙 <b id="coins">0</b></div>
     <div>💎 <b id="gems">0</b></div>
@@ -110,10 +149,11 @@
     <button class="primary" onclick="showTab('hub')">❤️ Hub</button>
     <button onclick="showTab('m3')">🍬 Match-3</button>
     <button onclick="showTab('bs')">🧪 Ball-Sort</button>
+    <button onclick="showTab('roster')">👥 Roster</button>
     <button onclick="showTab('gal')">🖼️ Galerie</button>
+    <button onclick="showTab('set')">⚙️</button>
   </div>
 
-  <!-- HUB -->
   <section id="tab-hub" class="card">
     <div class="char">
       <div class="portrait" id="portrait">🙂</div>
@@ -127,25 +167,24 @@
         <div class="bar"><label><span>Stimmung</span><span id="moodTxt">0</span></label><div class="track"><div class="fill mood" id="moodBar"></div></div></div>
       </div>
     </div>
-    <p class="muted" id="storyHint" style="margin:12px 0 0;"></p>
+    <div class="bubble" id="bubble">…</div>
+    <p class="muted" id="storyHint" style="margin:10px 0 0;"></p>
     <div class="btns">
-      <button onclick="giveGift('flowers','🌹 Blumen',40)">🌹 Blumen (40)</button>
-      <button onclick="giveGift('music','🎧 Musik',60)">🎧 Musik (60)</button>
-      <button onclick="giveGift('bugs','🐛 Käfer',20)">🐛 Käfer (20)</button>
+      <button id="gift0" onclick="giveGift(0)"></button>
+      <button id="gift1" onclick="giveGift(1)"></button>
+      <button id="gift2" onclick="giveGift(2)"></button>
       <button class="primary" onclick="goOnDate()">💞 Date (Story-Beat)</button>
     </div>
-    <p class="muted" style="margin-top:10px;">Tipp: Geschenke nach Geschmack wirken stärker. Spiele Minispiele für 🪙. Nach 5 Story-Beats kommt eine neue Person.</p>
+    <p class="muted" style="margin-top:10px;">Geschenke nach Geschmack wirken stärker. 🪙 aus Minispielen. Nach 5 Story-Beats wird die nächste Person freigeschaltet.</p>
   </section>
 
-  <!-- MATCH 3 -->
   <section id="tab-m3" class="card hidden">
     <div class="hud"><div>Punkte: <b id="m3score">0</b> / <span id="m3target">800</span></div><div>Züge: <b id="m3moves">20</b></div></div>
     <div id="m3grid"></div>
     <div class="btns"><button class="primary" onclick="startMatch3()">🔄 Neues Spiel</button><button onclick="showTab('hub')">Zurück</button></div>
-    <p class="muted">3+ gleiche tauschen. 4 in Reihe = Rakete 🚀, 5 = Farbbombe 💥. Ziel erreichen = 🪙 Belohnung.</p>
+    <p class="muted">3+ gleiche tauschen. 4 in Reihe = Rakete 🚀, 5 = Farbbombe 💥. Ziel erreichen = 🪙.</p>
   </section>
 
-  <!-- BALL SORT -->
   <section id="tab-bs" class="card hidden">
     <div class="hud"><div>Züge: <b id="bsmoves">0</b></div><div id="bsstatus" class="muted">Sortiere alle Farben.</div></div>
     <div id="tubes"></div>
@@ -153,18 +192,30 @@
     <p class="muted">Glas antippen (Quelle), dann Ziel-Glas. Nur auf gleiche Farbe oder leeres Glas.</p>
   </section>
 
-  <!-- GALLERY -->
+  <section id="tab-roster" class="card hidden">
+    <h2>Roster</h2>
+    <div class="roster" id="rosterGrid"></div>
+    <p class="muted" style="margin-top:10px;">Freigeschaltete Personen wählen. Neue über Story-Beats (Dates). Seltene Event-Charaktere später per Gacha.</p>
+  </section>
+
   <section id="tab-gal" class="card hidden">
     <h2>Galerie — <span id="galChar">—</span></h2>
     <div class="gallery" id="gallery"></div>
-    <p class="muted">Belohnungen schalten sich mit steigender Beziehungsstufe frei (hier als Platzhalter — im echten Spiel via ComfyUI generiert).</p>
+    <p class="muted">Belohnungen schalten sich mit der Beziehungsstufe frei (Platzhalter — im echten Spiel via ComfyUI generiert).</p>
+  </section>
+
+  <section id="tab-set" class="card hidden">
+    <h2>Einstellungen</h2>
+    <div class="setrow"><span>Inhalts-Variante</span><b id="setTier">SFW</b></div>
+    <div class="setrow"><span>Sound</span><button onclick="toggleSound()" id="soundBtn">🔊 An</button></div>
+    <div class="setrow"><span>Fortschritt</span><button onclick="resetProgress()">🗑️ Zurücksetzen</button></div>
+    <p class="muted" style="margin-top:12px;">Fortschritt wird automatisch lokal gespeichert (localStorage).</p>
   </section>
 
   <p class="policy">Prototyp · Inhalte = Platzhalter · ausschließlich fiktive, erwachsene Charaktere</p>
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="game.js"></script>
 </body>
 </html>

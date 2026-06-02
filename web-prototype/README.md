@@ -18,12 +18,16 @@ python3 -m http.server 8080
 
 ## Was funktioniert
 
-- **Hub**: aktiver Charakter mit Sympathie/Vertrauen/Stimmung-Balken + Tier, Geschenke (wirken je nach
-  Geschmack stärker/schwächer), Date-Button (Story-Beat).
-- **Match-3**: 8×8, Tauschen, Matches/Kaskaden, 4er→Rakete, 5er→Farbbombe, Punkteziel → 🪙.
+- **Start-/Age-Gate**: Auswahl SFW / 18+ (Demo — beide nur Platzhalter), Altersbestätigung für 18+.
+- **Hub**: aktiver Charakter mit Sympathie/Vertrauen/Stimmung-Balken + Tier, **Dialog-Bubble je
+  Persönlichkeit/Tier**, Geschenke mit **Geschmacks-Präferenz** (💗 mag / 💤 mag nicht), Date-Button.
+- **Match-3**: 8×8, Tauschen, Matches/Kaskaden mit Combo-Sound, 4er→Rakete, 5er→Farbbombe, Ziel → 🪙.
 - **Ball-Sort**: Röhren sortieren, Undo, Lösungserkennung → 🪙.
-- **Sympathie-Loop**: 🪙 aus Minispielen → Geschenke → Tier steigt → Belohnung in der **Galerie**.
-- **Charakterwechsel** nach 5 Story-Beats; einfache Energie-Regeneration.
+- **Roster**: alle Charaktere mit Persönlichkeit/Tier, freigeschaltet/gesperrt, Wechsel per Tap.
+- **Galerie**: Belohnungs-Tiers pro Charakter mit „NEU"-Badges.
+- **Sympathie-Loop**: 🪙 aus Minispielen → Geschenke → Tier steigt → Belohnung in der Galerie.
+- **Charakterwechsel** nach 5 Story-Beats; Energie-Regeneration; **Sound** (WebAudio).
+- **Persistenz**: Fortschritt wird automatisch im `localStorage` gespeichert (Reset in den Einstellungen).
 
 ## Bezug zum echten Spiel
 
@@ -31,6 +35,9 @@ Die Mechanik spiegelt das Unity-Design (Tier-Schwellen, Stimmungs-Multiplikator,
 lösbarer Ball-Sort). Im echten Spiel sind die Belohnungen Bilder/Videos (via ComfyUI generiert);
 hier sind sie Platzhalter-Karten. Inhalte: ausschließlich fiktive, erwachsene Charaktere.
 
+![Start/Age-Gate](screenshots/0-gate.png)
 ![Hub](screenshots/1-hub.png)
 ![Match-3](screenshots/2-match3.png)
 ![Ball-Sort](screenshots/3-ballsort.png)
+![Roster](screenshots/4-roster.png)
+![Galerie](screenshots/5-gallery.png)
