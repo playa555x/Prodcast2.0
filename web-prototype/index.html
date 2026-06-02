@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Heart &amp; Match — Prototyp</title>
+<style>
+  :root {
+    --bg: #15111d; --panel: #221a30; --panel2: #2c2240; --accent: #ff5d8f;
+    --accent2: #8a5cff; --text: #f3eefb; --muted: #a89cc0; --good: #4fd1a5; --gold: #ffd166;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #2a1f3d, var(--bg)); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  }
+  header {
+    width: 100%; max-width: 760px; padding: 12px 16px; display: flex; gap: 10px;
+    align-items: center; justify-content: space-between;
+  }
+  .brand { font-weight: 800; letter-spacing: .5px; }
+  .brand span { color: var(--accent); }
+  .wallet { display: flex; gap: 14px; font-size: 14px; }
+  .wallet b { color: var(--gold); }
+  .app { width: 100%; max-width: 760px; padding: 0 16px 40px; }
+  .card { background: var(--panel); border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .col { flex: 1 1 320px; }
+  h2 { margin: 0 0 12px; font-size: 18px; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* Character panel */
+  .char { display: flex; gap: 14px; align-items: center; }
+  .portrait {
+    width: 92px; height: 92px; border-radius: 14px; flex: none;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center; font-size: 40px;
+  }
+  .bars { flex: 1; }
+  .bar { margin: 6px 0; }
+  .bar label { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+  .track { height: 9px; background: #392c52; border-radius: 6px; overflow: hidden; }
+  .fill { height: 100%; width: 0; transition: width .35s ease; }
+  .fill.aff { background: linear-gradient(90deg, #ff7eb3, var(--accent)); }
+  .fill.trust { background: linear-gradient(90deg, #7ab8ff, #4f8cff); }
+  .fill.mood { background: linear-gradient(90deg, #ffe08a, var(--gold)); }
+  .tier { font-weight: 800; color: var(--accent); }
+
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid #3b2f55; border-radius: 10px;
+    padding: 9px 12px; font-size: 14px; cursor: pointer; transition: transform .08s, background .15s;
+  }
+  button:hover { background: #38294f; }
+  button:active { transform: scale(.96); }
+  button.primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); border: none; font-weight: 700; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* Match-3 grid */
+  #m3grid { display: grid; gap: 4px; margin: 0 auto; touch-action: manipulation; }
+  .gem {
+    width: 100%; aspect-ratio: 1; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; cursor: pointer; user-select: none; transition: transform .1s, box-shadow .1s;
+  }
+  .gem.sel { outline: 3px solid #fff; transform: scale(.9); }
+  .gem.special { box-shadow: inset 0 0 0 3px rgba(255,255,255,.85); }
+
+  /* Ball sort */
+  #tubes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 10px 0; }
+  .tube {
+    width: 46px; background: rgba(255,255,255,.06); border: 2px solid #4a3a68;
+    border-top: none; border-radius: 0 0 22px 22px; display: flex; flex-direction: column-reverse;
+    align-items: center; padding: 6px 0; cursor: pointer; gap: 6px;
+  }
+  .tube.sel { border-color: #fff; }
+  .ball { width: 32px; height: 32px; border-radius: 50%; }
+
+  .gallery { display: flex; gap: 8px; flex-wrap: wrap; }
+  .reward {
+    width: 70px; height: 92px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; text-align: center; color: #fff; padding: 4px;
+    background: linear-gradient(160deg, var(--accent2), var(--accent));
+  }
+  .reward.locked { background: #2c2240; color: var(--muted); border: 1px dashed #4a3a68; }
+  .hud { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #2c2240; border: 1px solid var(--accent); padding: 10px 16px; border-radius: 12px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; font-size: 14px;
+  }
+  .toast.show { opacity: 1; }
+  .tabbtns { display: flex; gap: 8px; margin-bottom: 14px; }
+  .hidden { display: none; }
+  .policy { font-size: 11px; color: var(--muted); margin-top: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Heart <span>&amp;</span> Match <span class="muted" style="font-size:11px;">Prototyp</span></div>
+  <div class="wallet">
+    <div>🪙 <b id="coins">0</b></div>
+    <div>💎 <b id="gems">0</b></div>
+    <div>⚡ <b id="energy">0</b></div>
+  </div>
+</header>
+
+<div class="app">
+  <div class="tabbtns">
+    <button class="primary" onclick="showTab('hub')">❤️ Hub</button>
+    <button onclick="showTab('m3')">🍬 Match-3</button>
+    <button onclick="showTab('bs')">🧪 Ball-Sort</button>
+    <button onclick="showTab('gal')">🖼️ Galerie</button>
+  </div>
+
+  <!-- HUB -->
+  <section id="tab-hub" class="card">
+    <div class="char">
+      <div class="portrait" id="portrait">🙂</div>
+      <div class="bars">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 id="charName" style="margin:0">—</h2>
+          <div class="tier">Tier <span id="tier">0</span></div>
+        </div>
+        <div class="bar"><label><span>Sympathie</span><span id="affTxt">0</span></label><div class="track"><div class="fill aff" id="affBar"></div></div></div>
+        <div class="bar"><label><span>Vertrauen</span><span id="trustTxt">0</span></label><div class="track"><div class="fill trust" id="trustBar"></div></div></div>
+        <div class="bar"><label><span>Stimmung</span><span id="moodTxt">0</span></label><div class="track"><div class="fill mood" id="moodBar"></div></div></div>
+      </div>
+    </div>
+    <p class="muted" id="storyHint" style="margin:12px 0 0;"></p>
+    <div class="btns">
+      <button onclick="giveGift('flowers','🌹 Blumen',40)">🌹 Blumen (40)</button>
+      <button onclick="giveGift('music','🎧 Musik',60)">🎧 Musik (60)</button>
+      <button onclick="giveGift('bugs','🐛 Käfer',20)">🐛 Käfer (20)</button>
+      <button class="primary" onclick="goOnDate()">💞 Date (Story-Beat)</button>
+    </div>
+    <p class="muted" style="margin-top:10px;">Tipp: Geschenke nach Geschmack wirken stärker. Spiele Minispiele für 🪙. Nach 5 Story-Beats kommt eine neue Person.</p>
+  </section>
+
+  <!-- MATCH 3 -->
+  <section id="tab-m3" class="card hidden">
+    <div class="hud"><div>Punkte: <b id="m3score">0</b> / <span id="m3target">800</span></div><div>Züge: <b id="m3moves">20</b></div></div>
+    <div id="m3grid"></div>
+    <div class="btns"><button class="primary" onclick="startMatch3()">🔄 Neues Spiel</button><button onclick="showTab('hub')">Zurück</button></div>
+    <p class="muted">3+ gleiche tauschen. 4 in Reihe = Rakete 🚀, 5 = Farbbombe 💥. Ziel erreichen = 🪙 Belohnung.</p>
+  </section>
+
+  <!-- BALL SORT -->
+  <section id="tab-bs" class="card hidden">
+    <div class="hud"><div>Züge: <b id="bsmoves">0</b></div><div id="bsstatus" class="muted">Sortiere alle Farben.</div></div>
+    <div id="tubes"></div>
+    <div class="btns"><button class="primary" onclick="startBallSort()">🔄 Neues Spiel</button><button onclick="bsUndo()">↩️ Undo</button><button onclick="showTab('hub')">Zurück</button></div>
+    <p class="muted">Glas antippen (Quelle), dann Ziel-Glas. Nur auf gleiche Farbe oder leeres Glas.</p>
+  </section>
+
+  <!-- GALLERY -->
+  <section id="tab-gal" class="card hidden">
+    <h2>Galerie — <span id="galChar">—</span></h2>
+    <div class="gallery" id="gallery"></div>
+    <p class="muted">Belohnungen schalten sich mit steigender Beziehungsstufe frei (hier als Platzhalter — im echten Spiel via ComfyUI generiert).</p>
+  </section>
+
+  <p class="policy">Prototyp · Inhalte = Platzhalter · ausschließlich fiktive, erwachsene Charaktere</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="game.js"></script>
+</body>
+</html>
