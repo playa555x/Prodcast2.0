@@ -83,7 +83,9 @@ const MODES = {
   endless:    { id: "endless",    name: "Endlos",      icon: "♾️", desc: "Spielen bis keine Züge mehr",     moves: 0,  target: 0,    ice: false, seeded: false, endless: true,  timed: 0  },
   timeattack: { id: "timeattack", name: "Time Attack", icon: "⏱️", desc: "60 Sek — maximale Punkte",        moves: 0,  target: 0,    ice: false, seeded: false, endless: true,  timed: 60 },
 };
-function startMode(id) { M3.mode = MODES[id] || MODES.story; showTab("m3"); }
+function startMode(id) { M3.mode = MODES[id] || MODES.story; M3.playLevel = null; showTab("m3"); }
+// Story-Level von der Welt-Karte aus starten (bestimmtes Feld).
+function startStory(level) { M3.mode = MODES.story; M3.playLevel = level; showTab("m3"); }
 // Echte Frucht-Designs als Emoji-Textur (klar erkennbar, offline, voll farbig).
 const FRUIT = [
   { name: "apfel",        emoji: "🍎", color: 0xff4356 },
@@ -134,7 +136,7 @@ function makeSpecial(type, kind) {
 
 function startMatch3() {
   const mode = M3.mode || (M3.mode = MODES.story);
-  const lvl = (state && state.m3level) || 1;
+  const lvl = M3.playLevel || (state && state.m3level) || 1;
   M3.rng = mode.seeded ? mulberry32(dateSeed()) : Math.random;
   M3.score = 0; M3.sel = null; M3.busy = false; M3.ended = false;
   M3.moves = mode.endless ? Infinity : (mode.moves + (mode.id === "story" ? Math.min(8, lvl) : 0));
@@ -499,7 +501,11 @@ function endMode(won) {
   if (M3.ended) return; M3.ended = true; M3.busy = true;
   const mode = M3.mode;
   if (won) {
-    if (mode.id === "story") state.m3level = (state.m3level || 1) + 1;
+    if (mode.id === "story") {
+      const played = M3.playLevel || state.m3level || 1;
+      if (played >= (state.m3level || 1)) state.m3level = (state.m3level || 1) + 1;  // nur die Front rückt vor
+      M3.playLevel = null;
+    }
     if (mode.id === "daily") { state.dailyDone = dateSeed(); state.dailyBest = Math.max(state.dailyBest || 0, M3.score); }
     if (mode.endless) state.endlessBest = Math.max(state.endlessBest || 0, M3.score);
     const reward = Math.max(10, Math.floor(M3.score / 7));
@@ -807,6 +813,7 @@ function endBS() {
 // Globals exportieren (Buttons in index.html)
 window.startMatch3 = startMatch3;
 window.startMode = startMode;
+window.startStory = startStory;
 window.m3Finish = m3Finish;
 window.M3MODES = MODES;
 window.dateSeedVal = dateSeed;

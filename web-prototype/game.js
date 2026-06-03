@@ -99,8 +99,9 @@ function enterGame(tier) {
 // ---------- Tabs ----------
 function showTab(tab) {
   if (typeof stopGame3D === "function") stopGame3D();
-  ["hub", "modes", "m3", "bs", "roster", "gal", "pass", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
+  ["hub", "welt", "modes", "m3", "bs", "roster", "gal", "pass", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
   if (tab === "hub") refreshHub();
+  if (tab === "welt") renderWorld();
   if (tab === "modes") renderModes();
   if (tab === "m3") startMatch3();
   if (tab === "bs") startBallSort();
@@ -162,6 +163,45 @@ function claimDaily() {
   if (state.streak % 7 === 0) state.gems += 20;
   beep(990, .18); toast(`🎁 Tag ${state.streak}: +${reward} 🪙` + (state.streak % 7 === 0 ? " +20 💎" : ""));
   save(); refreshHub();
+}
+
+// Welt-Karte: serpentiner Pfad aus Level-Feldern (Brettspiel-Stil), Spielfigur am aktuellen Feld.
+function renderWorld() {
+  const wrap = $("worldwrap"), inner = $("worldinner");
+  const W = wrap.clientWidth || 360;
+  const cur = state.m3level || 1;
+  const N = Math.max(cur + 5, 16);
+  const cols = W < 430 ? 4 : 5;
+  const margin = 46, rowH = 100, pad = 64;
+  const rows = Math.ceil(N / cols);
+  const innerH = rows * rowH + pad * 2;
+  const colX = c => cols === 1 ? W / 2 : margin + c * ((W - 2 * margin) / (cols - 1));
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const row = Math.floor(i / cols); let c = i % cols; if (row % 2 === 1) c = cols - 1 - c;
+    pts.push({ x: colX(c), y: pad + (rows - 1 - row) * rowH, lvl: i + 1 });
+  }
+  const d = pts.map((p, i) => (i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1)).join(" ");
+  inner.style.height = innerH + "px";
+  inner.innerHTML =
+    `<svg width="${W}" height="${innerH}" style="position:absolute;inset:0;z-index:0;">
+       <path d="${d}" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+       <path d="${d}" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+       <path d="${d}" fill="none" stroke="rgba(255,255,255,.30)" stroke-width="3" stroke-dasharray="2 13" stroke-linecap="round"/>
+     </svg>`;
+  pts.forEach(p => {
+    const done = p.lvl < cur, isCur = p.lvl === cur, boss = p.lvl % 5 === 0;
+    const f = document.createElement("div");
+    f.className = "field" + (done ? " done" : isCur ? " cur" : " locked") + (boss ? " boss" : "");
+    f.style.left = p.x + "px"; f.style.top = p.y + "px";
+    f.innerHTML = done ? "★" : (boss ? "👑<span class='lvn'>" + p.lvl + "</span>" : p.lvl);
+    if (isCur) { const tok = document.createElement("div"); tok.className = "token"; tok.textContent = curDef().emoji; f.appendChild(tok); }
+    if (p.lvl <= cur) f.onclick = () => { beep(520, .07); window.startStory(p.lvl); };
+    else f.onclick = () => { beep(180, .1, "square"); toast("🔒 Erst die vorherigen Felder schaffen"); };
+    inner.appendChild(f);
+  });
+  const cp = pts[cur - 1] || pts[0];
+  wrap.scrollTop = Math.max(0, cp.y - wrap.clientHeight / 2);
 }
 
 // Modus-Auswahl-Hub (datengetrieben aus games3d.js — MODES). Klick startet den Modus.
