@@ -21,10 +21,13 @@ python3 -m http.server 8080
 - **Start-/Age-Gate**: Auswahl SFW / 18+ (Demo — beide nur Platzhalter), Altersbestätigung für 18+.
 - **Hub**: aktiver Charakter mit Sympathie/Vertrauen/Stimmung-Balken + Tier, **Dialog-Bubble je
   Persönlichkeit/Tier**, Geschenke mit **Geschmacks-Präferenz** (💗 mag / 💤 mag nicht), Date-Button.
-- **Match-3 (3D-Früchte)**: 8×8, Tauschen, Kaskaden, 4er→Rakete, 5er→Farbbombe, Ziel → 🪙.
+- **Match-3 (echte Früchte 🍎🍊🍋🍉🫐🍇)** auf 3D-Spielfläche: 8×8, Tauschen, Kaskaden,
+  4er→Rakete 🚀, 5er→Farbbombe 💥, Ziel → 🪙.
   **Juice:** Partikel-Burst beim Auflösen, Screenshake + Hit-Stop beim Spezialstein-Zünden, Combo-Tonleiter.
-  **Hindernis 🧊 Eis** (mehrschichtig): vereiste Früchte sind nicht bewegbar und schmelzen Schicht für
-  Schicht durch Matches direkt daneben — Level gewonnen erst, wenn Ziel erreicht **und** alles Eis geräumt ist.
+  **Hindernis 🧊 Eis** (mehrschichtig, vereiste Früchte sind nicht bewegbar und schmelzen Schicht für
+  Schicht durch Matches direkt daneben). **Das Eis entwickelt sich mit dem Level:**
+  Raureif (L1–2) → Eis (L3–4) → Frost-Kristall (L5–6) → Permafrost (L7+) — jeweils anderes Aussehen
+  und mehr Schichten. Level gewonnen erst, wenn Ziel erreicht **und** alles Eis geräumt ist.
 - **Ball-Sort**: Röhren sortieren, Undo, Lösungserkennung → 🪙.
 - **Roster**: alle Charaktere mit Persönlichkeit/Tier, freigeschaltet/gesperrt, Wechsel per Tap.
 - **Galerie**: Belohnungs-Tiers pro Charakter mit „NEU"-Badges.

@@ -45,15 +45,28 @@ const M3 = {
   busy: false, scene: null, cam: null, renderer: null, raycaster: null, mount: null,
   particles: [], shake: 0, camBase: new THREE.Vector3(0, -0.8, 12.2), iceLeft: 0,
 };
-// Früchte: Farbe + Form + Deko
+// Echte Frucht-Designs als Emoji-Textur (klar erkennbar, offline, voll farbig).
 const FRUIT = [
-  { name: "apfel",      color: 0xff4356, sx: 1.0,  sy: 0.93, leaf: true,  stem: true },
-  { name: "orange",     color: 0xff9f1a, sx: 1.0,  sy: 0.98, leaf: true,  stem: false },
-  { name: "zitrone",    color: 0xffe04d, sx: 1.12, sy: 0.8,  leaf: false, stem: false },
-  { name: "limette",    color: 0x7bd64b, sx: 0.96, sy: 0.96, leaf: false, stem: false },
-  { name: "heidelbeere",color: 0x5a78ff, sx: 0.82, sy: 0.82, leaf: false, stem: true },
-  { name: "traube",     color: 0xb15cff, sx: 0.9,  sy: 0.9,  leaf: false, stem: true },
+  { name: "apfel",        emoji: "🍎", color: 0xff4356 },
+  { name: "orange",       emoji: "🍊", color: 0xff9f1a },
+  { name: "zitrone",      emoji: "🍋", color: 0xffe04d },
+  { name: "wassermelone", emoji: "🍉", color: 0x7bd64b },
+  { name: "heidelbeere",  emoji: "🫐", color: 0x5a78ff },
+  { name: "traube",       emoji: "🍇", color: 0xb15cff },
 ];
+
+const _texCache = {};
+function emojiTexture(emoji) {
+  if (_texCache[emoji]) return _texCache[emoji];
+  const s = 256, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const ctx = cv.getContext("2d");
+  ctx.font = `${Math.floor(s * 0.76)}px "Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.38)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8;
+  ctx.fillText(emoji, s / 2, s / 2 + 8);
+  const tex = new T.CanvasTexture(cv); tex.encoding = T.sRGBEncoding; tex.needsUpdate = true;
+  _texCache[emoji] = tex; return tex;
+}
 
 function worldPos(x, y) {
   return new T.Vector3((x - (M3.W - 1) / 2) * M3.cs, ((M3.H - 1) / 2 - y) * M3.cs, 0);
@@ -61,23 +74,9 @@ function worldPos(x, y) {
 
 function makeFruit(type) {
   const f = FRUIT[type], g = new T.Group();
-  const body = new T.Mesh(
-    new T.SphereGeometry(0.5, 28, 22),
-    new T.MeshStandardMaterial({ color: f.color, roughness: 0.32, metalness: 0.05 })
-  );
-  body.scale.set(f.sx, f.sy, f.sx); body.castShadow = true; body.receiveShadow = true;
-  g.add(body);
-  if (f.stem) {
-    const stem = new T.Mesh(new T.CylinderGeometry(0.04, 0.05, 0.22, 6),
-      new T.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.8 }));
-    stem.position.y = 0.45 * f.sy; stem.rotation.z = 0.2; g.add(stem);
-  }
-  if (f.leaf) {
-    const leaf = new T.Mesh(new T.SphereGeometry(0.12, 10, 8),
-      new T.MeshStandardMaterial({ color: 0x4caf50, roughness: 0.6 }));
-    leaf.scale.set(1.6, 0.25, 0.9); leaf.position.set(0.13, 0.5 * f.sy, 0); g.add(leaf);
-  }
-  g.userData = { type, body, mat: body.material, ts: 1, baseScale: 1, spin: 0.003 + Math.random() * 0.004 };
+  const spr = new T.Sprite(new T.SpriteMaterial({ map: emojiTexture(f.emoji), transparent: true }));
+  spr.scale.set(1.12, 1.12, 1.12); g.add(spr);
+  g.userData = { type, body: spr, mat: spr.material, ts: 1, baseScale: 1, spin: 0, frozen: false };
   g.scale.setScalar(0.01); // poppt rein
   return g;
 }
@@ -85,11 +84,12 @@ function makeFruit(type) {
 function makeSpecial(type, kind) {
   const g = makeFruit(type);
   g.userData.kind = kind;
-  g.userData.mat.emissive = new T.Color(kind === "color" ? 0xffffff : 0xffe066);
-  g.userData.mat.emissiveIntensity = 0.5;
-  const ringGeo = new T.TorusGeometry(0.55, 0.06, 8, 24);
-  const ring = new T.Mesh(ringGeo, new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 }));
-  g.add(ring); g.userData.ring = ring; g.userData.baseScale = 1.12;
+  const ring = new T.Mesh(new T.TorusGeometry(0.6, 0.06, 8, 24),
+    new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.9 }));
+  g.add(ring); g.userData.ring = ring;
+  const badge = new T.Sprite(new T.SpriteMaterial({ map: emojiTexture(kind === "color" ? "💥" : "🚀"), transparent: true }));
+  badge.scale.set(0.62, 0.62, 0.62); badge.position.set(0.28, 0.32, 0.2); g.add(badge);
+  g.userData.baseScale = 1.12;
   return g;
 }
 
@@ -119,15 +119,17 @@ function startMatch3() {
       M3.grid[y][x] = newCell(c, x, y, true);
     } }
 
-  // Hindernis: Eis-Blocker säen (skaliert mit Level). Mehrschichtig -> mehrere Matches nötig.
+  // Hindernis: Eis-Blocker säen. Stufe + Menge wachsen mit dem Level.
   M3.particles = []; M3.shake = 0; M3.iceLeft = 0;
-  const iceCount = Math.min(14, 3 + lvl * 2);
+  const style = iceStyleForLevel(lvl);
+  M3.iceStyle = style;
+  const iceCount = Math.min(16, 3 + lvl * 2);
   const spots = new Set();
   for (let i = 0; i < iceCount; i++) {
     const x = (Math.random() * M3.W) | 0, y = (Math.random() * M3.H) | 0, k = x + "," + y;
     if (spots.has(k)) continue; spots.add(k);
-    const layers = 1 + ((Math.random() * Math.min(3, 1 + Math.floor(lvl / 2))) | 0);
-    setIce(M3.grid[y][x], layers); M3.iceLeft++;
+    const layers = 1 + ((Math.random() * style.maxLayers) | 0); // 1..maxLayers
+    setIce(M3.grid[y][x], layers, style); M3.iceLeft++;
   }
 
   M3.renderer.domElement.style.cursor = "pointer";
@@ -147,19 +149,29 @@ function newCell(type, x, y, dropFromTop, ice) {
   return cell;
 }
 
-// Eis-Blocker: durchscheinende Hülle um die Frucht; Schichten 1–3 (durch benachbarte Matches auftauen)
-function setIce(cell, layers) {
+// Eis-Stufen: ändern sich mit dem Level (Aussehen + max. Schichten/Zähigkeit).
+function iceStyleForLevel(lvl) {
+  if (lvl <= 2) return { key: "raureif",    label: "Raureif",       color: 0xdff1ff, emissive: 0x000000, detail: 0, scale: 0.70, maxLayers: 1, op: 0.28 };
+  if (lvl <= 4) return { key: "eis",        label: "Eis",           color: 0x9ad4ff, emissive: 0x113355, detail: 0, scale: 0.74, maxLayers: 2, op: 0.40 };
+  if (lvl <= 6) return { key: "frost",      label: "Frost-Kristall",color: 0xeaf6ff, emissive: 0x2277bb, detail: 1, scale: 0.78, maxLayers: 3, op: 0.44 };
+  return            { key: "permafrost", label: "Permafrost",    color: 0x6fa8ff, emissive: 0x1144aa, detail: 1, scale: 0.82, maxLayers: 4, op: 0.52 };
+}
+
+// Eis-Blocker: durchscheinende Hülle um die Frucht; taut Schicht für Schicht durch benachbarte Matches.
+function setIce(cell, layers, style) {
   cell.ice = layers;
+  if (style) cell.iceStyle = style;
+  const st = cell.iceStyle || iceStyleForLevel(1);
   const g = cell.mesh;
-  if (g.userData.iceMesh) { g.remove(g.userData.iceMesh); g.userData.iceMesh = null; }
+  if (g.userData.iceMesh) { g.remove(g.userData.iceMesh); g.userData.iceMesh.geometry.dispose(); g.userData.iceMesh = null; }
   if (layers > 0) {
     const shell = new T.Mesh(
-      new T.IcosahedronGeometry(0.72, 0),
-      new T.MeshPhysicalMaterial({ color: 0xcde7ff, transparent: true, opacity: 0.32 + layers * 0.16,
-        roughness: 0.15, metalness: 0, clearcoat: 1, flatShading: true })
+      new T.IcosahedronGeometry(st.scale, st.detail),
+      new T.MeshPhysicalMaterial({ color: st.color, emissive: st.emissive, emissiveIntensity: 0.35,
+        transparent: true, opacity: Math.min(0.85, st.op + (layers - 1) * 0.12),
+        roughness: 0.12, metalness: 0, clearcoat: 1, flatShading: true })
     );
-    g.add(shell); g.userData.iceMesh = shell;
-    g.userData.frozen = true;
+    g.add(shell); g.userData.iceMesh = shell; g.userData.frozen = true;
   } else { g.userData.frozen = false; }
 }
 
@@ -224,8 +236,7 @@ function findCell(grp) {
 }
 function highlight(grp, on) {
   if (!grp || !grp.userData) return;
-  grp.userData.ts = on ? 1.18 : 1.0;
-  grp.userData.mat.emissive = new T.Color(on ? 0x555555 : (grp.userData.kind === "color" ? 0xffffff : grp.userData.kind ? 0xffe066 : 0x000000));
+  grp.userData.ts = on ? 1.2 : 1.0;
 }
 
 async function doSwap(a, b) {
@@ -349,7 +360,11 @@ function gravity() {
     for (; y >= 0; y--) M3.grid[y][x] = newCell((Math.random() * M3.C) | 0, x, y, true);
   }
 }
-function updateM3Hud() { $("m3score").textContent = M3.score; $("m3moves").textContent = M3.moves; $("m3target").textContent = M3.target; $("m3ice").textContent = M3.iceLeft; }
+function updateM3Hud() {
+  $("m3score").textContent = M3.score; $("m3moves").textContent = M3.moves;
+  $("m3target").textContent = M3.target; $("m3ice").textContent = M3.iceLeft;
+  $("m3icetype").textContent = (M3.iceLeft > 0 && M3.iceStyle) ? "(" + M3.iceStyle.label + ")" : "";
+}
 function endM3(won) {
   M3.busy = true;
   if (won) {
