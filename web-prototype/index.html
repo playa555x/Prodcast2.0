@@ -151,6 +151,7 @@
     <button onclick="showTab('bs')">🧪 Ball-Sort</button>
     <button onclick="showTab('roster')">👥 Roster</button>
     <button onclick="showTab('gal')">🖼️ Galerie</button>
+    <button onclick="showTab('pass')">🎟️ Pass</button>
     <button onclick="showTab('set')">⚙️</button>
   </div>
 
@@ -169,6 +170,10 @@
     </div>
     <div class="bubble" id="bubble">…</div>
     <p class="muted" id="storyHint" style="margin:10px 0 0;"></p>
+    <div class="bubble" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <span id="dailyInfo" class="muted"></span>
+      <button class="primary" id="dailyBtn" onclick="claimDaily()">🎁 Abholen</button>
+    </div>
     <div class="btns">
       <button id="gift0" onclick="giveGift(0)"></button>
       <button id="gift1" onclick="giveGift(1)"></button>
@@ -208,6 +213,13 @@
     <h2>Galerie — <span id="galChar">—</span></h2>
     <div class="gallery" id="gallery"></div>
     <p class="muted">Belohnungen schalten sich mit der Beziehungsstufe frei (Platzhalter — im echten Spiel via ComfyUI generiert).</p>
+  </section>
+
+  <section id="tab-pass" class="card hidden">
+    <h2>Battle-Pass <span id="passPremiumTag" class="tier"></span></h2>
+    <div class="setrow"><span>Punkte: <b id="passPoints">0</b> 🎟️</span><button class="primary" id="passPremiumBtn" onclick="unlockPremium()">⭐ Premium (50 💎)</button></div>
+    <div id="passTrack"></div>
+    <p class="muted">Punkte sammelst du durch gewonnene Minispiele. Frei-Track für alle, Premium-Track optional.</p>
   </section>
 
   <section id="tab-set" class="card hidden">

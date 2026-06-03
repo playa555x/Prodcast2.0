@@ -31,6 +31,23 @@ Nach `docs/RESEARCH_MODES.md` aufgebaut: **ein** Match-3-Kern, die Modi untersch
 Enthält auch `hasValidMove()` + **Auto-Shuffle** (aus der Architektur-Recherche): gibt es keinen gültigen
 Zug mehr, wird automatisch neu gemischt (bzw. Endlos endet und zahlt aus).
 
+## Hindernisse (gestaffelt nach Bloom-Schedule, Story-Modus)
+
+Neue Blocker kommen mit steigendem Level dazu — wie in den Top-Games (isolated → kombiniert):
+
+| Ab Level | Blocker | Verhalten |
+|---|---|---|
+| L1 | 🧊 **Eis** | mehrschichtig, schmilzt durch Nachbar-Matches; entwickelt sich (Raureif→Permafrost) |
+| L3 | 🔒 **Schloss** | Frucht nicht bewegbar; durch Nachbar-Match knacken |
+| L5 | 💣 **Countdown-Bombe** | Zahl sinkt pro Zug — bei 0 verloren; durch Matchen entschärfen |
+
+## Meta-Systeme
+
+- 🎟️ **Battle-Pass / Saison**: Punkte aus jedem Minispiel-Sieg; 10 Stufen, Frei- + Premium-Track,
+  einlösbare Belohnungen (spiegelt Backend `/api/liveops/season`).
+- 🎁 **Tagesgeschenk / Login-Streak**: skalierende Belohnung pro Tag, Bonus alle 7 Tage.
+- **Beziehungs-Kopplung**: Minispiel-Siege geben auch etwas Sympathie (Stat-Rückfluss).
+
 ## Was funktioniert
 
 - **Start-/Age-Gate**: Auswahl SFW / 18+ (Demo — beide nur Platzhalter), Altersbestätigung für 18+.

@@ -32,10 +32,20 @@ const SAVE_KEY = "heartmatch_save_v1";
 // ---------- Zustand ----------
 let state;
 function freshState(tier) {
-  const s = { coins: 200, gems: 50, energy: 5, active: 0, maxUnlocked: 0, storyBeats: 0, contentTier: tier || "sfw", sound: true, chars: {} };
+  const s = { coins: 200, gems: 50, energy: 5, active: 0, maxUnlocked: 0, storyBeats: 0, contentTier: tier || "sfw", sound: true, chars: {},
+    passPoints: 0, passClaimed: [], passPremium: false, lastDaily: 0, streak: 0 };
   ROSTER.forEach(c => s.chars[c.id] = { affection: 0, trust: 0, mood: 50, tier: 0, unlocked: [], seen: [] });
   return s;
 }
+
+// Battle-Pass-Track (spiegelt backend /api/liveops/season): 10 Stufen, frei + Premium.
+const PASS_TIERS = Array.from({ length: 10 }, (_, i) => ({
+  tier: i, points: (i + 1) * 100,
+  free: { type: "coins", qty: 100 + i * 20 },
+  premium: i % 2 ? { type: "gems", qty: 10 + i * 5 } : { type: "coins", qty: 300 + i * 40 },
+}));
+function todayInt() { const d = new Date(); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); }
+const DAILY_REWARDS = [100, 150, 200, 300, 500, 750, 1000]; // nach Login-Streak
 function cur() { return state.chars[ROSTER[state.active].id]; }
 function curDef() { return ROSTER[state.active]; }
 
@@ -89,13 +99,69 @@ function enterGame(tier) {
 // ---------- Tabs ----------
 function showTab(tab) {
   if (typeof stopGame3D === "function") stopGame3D();
-  ["hub", "modes", "m3", "bs", "roster", "gal", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
+  ["hub", "modes", "m3", "bs", "roster", "gal", "pass", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
   if (tab === "hub") refreshHub();
   if (tab === "modes") renderModes();
   if (tab === "m3") startMatch3();
   if (tab === "bs") startBallSort();
   if (tab === "roster") renderRoster();
   if (tab === "gal") renderGallery();
+  if (tab === "pass") renderPass();
+}
+
+// ---------- Battle-Pass / Saison ----------
+function renderPass() {
+  const wrap = $("passTrack"); wrap.innerHTML = "";
+  $("passPoints").textContent = state.passPoints || 0;
+  $("passPremiumBtn").style.display = state.passPremium ? "none" : "inline-block";
+  $("passPremiumTag").textContent = state.passPremium ? "Premium aktiv ⭐" : "";
+  PASS_TIERS.forEach(t => {
+    const reached = (state.passPoints || 0) >= t.points;
+    const row = document.createElement("div");
+    row.className = "setrow";
+    row.innerHTML = `<span>Stufe ${t.tier + 1} · ${t.points} 🎟️</span>`;
+    row.appendChild(passReward("free", t, reached));
+    row.appendChild(passReward("premium", t, reached));
+    wrap.appendChild(row);
+  });
+}
+function passReward(track, t, reached) {
+  const r = t[track]; const key = `${track}:${t.tier}`;
+  const claimed = (state.passClaimed || []).includes(key);
+  const b = document.createElement("button");
+  const icon = r.type === "gems" ? "💎" : "🪙";
+  b.textContent = `${track === "premium" ? "⭐" : ""}${r.qty} ${icon}`;
+  if (claimed) { b.disabled = true; b.textContent += " ✓"; }
+  else if (!reached || (track === "premium" && !state.passPremium)) { b.disabled = true; }
+  else { b.className = "primary"; b.onclick = () => claimPass(track, t); }
+  return b;
+}
+function claimPass(track, t) {
+  const key = `${track}:${t.tier}`;
+  if ((state.passClaimed || []).includes(key)) return;
+  const r = t[track];
+  if (r.type === "gems") state.gems += r.qty; else state.coins += r.qty;
+  state.passClaimed = state.passClaimed || []; state.passClaimed.push(key);
+  beep(880, .12); toast(`Belohnung: +${r.qty} ${r.type === "gems" ? "💎" : "🪙"}`); save(); refreshWallet(); renderPass();
+}
+function unlockPremium() {
+  const cost = 50;
+  if (state.gems < cost) { toast("Zu wenig 💎 (50 nötig)"); return; }
+  state.gems -= cost; state.passPremium = true; beep(990, .15); toast("⭐ Premium-Pass freigeschaltet"); save(); refreshWallet(); renderPass();
+}
+
+// ---------- Tages-Belohnung / Login-Streak ----------
+function claimDaily() {
+  const today = todayInt();
+  if (state.lastDaily === today) { toast("Heute schon abgeholt"); return; }
+  state.streak = (state.lastDaily === today - 1) ? (state.streak || 0) + 1 : 1;
+  state.lastDaily = today;
+  const idx = Math.min(DAILY_REWARDS.length - 1, (state.streak - 1));
+  const reward = DAILY_REWARDS[idx];
+  state.coins += reward;
+  if (state.streak % 7 === 0) state.gems += 20;
+  beep(990, .18); toast(`🎁 Tag ${state.streak}: +${reward} 🪙` + (state.streak % 7 === 0 ? " +20 💎" : ""));
+  save(); refreshHub();
 }
 
 // Modus-Auswahl-Hub (datengetrieben aus games3d.js — MODES). Klick startet den Modus.
@@ -132,6 +198,11 @@ function refreshHub() {
     const pref = info.liked.includes(g.tag) ? " 💗" : info.disliked.includes(g.tag) ? " 💤" : "";
     $("gift" + i).textContent = `${g.label} (${g.cost})${pref}`;
   });
+  const dailyReady = state.lastDaily !== todayInt();
+  $("dailyBtn").style.display = dailyReady ? "inline-block" : "none";
+  $("dailyInfo").textContent = dailyReady
+    ? `🎁 Tagesgeschenk bereit! (Streak ${state.streak || 0})`
+    : `✓ Heute abgeholt · Streak ${state.streak || 0}`;
   refreshWallet();
 }
 
@@ -214,8 +285,12 @@ function resetProgress() {
 // ---------- Minispiel-Ergebnis (die 3D-Spiele in games3d.js rufen das auf) ----------
 function minigameFinished(coins) {
   state.coins += coins;
-  const c = cur(); c.mood = clamp(c.mood + 6, 0, 100);
-  beep(990, .2); toast(`🎉 +${coins} 🪙`); save(); refreshWallet();
+  state.passPoints = (state.passPoints || 0) + 20;     // Pass-Punkte aus jedem Sieg
+  const c = cur();
+  c.mood = clamp(c.mood + 6, 0, 100);
+  c.affection = clamp(c.affection + 2, 0, 100);          // Minispiel-Sieg vertieft auch die Beziehung
+  checkTierUp(c);
+  beep(990, .2); toast(`🎉 +${coins} 🪙  ·  +20 🎟️`); save(); refreshWallet();
   setTimeout(() => showTab("hub"), 1300);
 }
 
