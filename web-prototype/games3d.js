@@ -149,50 +149,146 @@ function newCell(type, x, y, dropFromTop, ice) {
   return cell;
 }
 
-// Eis-Stufen: ändern sich mit dem Level (Aussehen + max. Schichten/Zähigkeit).
-function iceStyleForLevel(lvl) {
-  if (lvl <= 2) return { key: "raureif",    label: "Raureif",       color: 0xdff1ff, emissive: 0x000000, detail: 0, scale: 0.70, maxLayers: 1, op: 0.28 };
-  if (lvl <= 4) return { key: "eis",        label: "Eis",           color: 0x9ad4ff, emissive: 0x113355, detail: 0, scale: 0.74, maxLayers: 2, op: 0.40 };
-  if (lvl <= 6) return { key: "frost",      label: "Frost-Kristall",color: 0xeaf6ff, emissive: 0x2277bb, detail: 1, scale: 0.78, maxLayers: 3, op: 0.44 };
-  return            { key: "permafrost", label: "Permafrost",    color: 0x6fa8ff, emissive: 0x1144aa, detail: 1, scale: 0.82, maxLayers: 4, op: 0.52 };
+// --- Canvas-Texturen für Eis (einmal erzeugt, geteilt) ---
+let _frostTex, _sparkleTex, _puffTex; const _crackTex = {};
+function frostTex() {
+  if (_frostTex) return _frostTex;
+  const s = 128, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const ctx = cv.getContext("2d"); ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 1800; i++) { const v = (128 + (Math.random() - 0.5) * 190) | 0; ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fillRect((Math.random() * s) | 0, (Math.random() * s) | 0, 2, 2); }
+  _frostTex = new T.CanvasTexture(cv); _frostTex.wrapS = _frostTex.wrapT = T.RepeatWrapping; return _frostTex;
+}
+function crackTex(n) {
+  if (_crackTex[n]) return _crackTex[n];
+  const s = 256, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const ctx = cv.getContext("2d"); ctx.translate(s / 2, s / 2);
+  const branches = 2 + n * 2;
+  for (let b = 0; b < branches; b++) {
+    let a = Math.random() * 6.28, x = 0, y = 0; ctx.beginPath(); ctx.moveTo(0, 0);
+    const segs = 3 + ((Math.random() * 3) | 0);
+    for (let k = 0; k < segs; k++) { a += (Math.random() - 0.5) * 1.0; const len = 12 + Math.random() * 24; x += Math.cos(a) * len; y += Math.sin(a) * len; ctx.lineTo(x, y); }
+    ctx.lineWidth = 3.2; ctx.strokeStyle = "rgba(62,159,203,0.85)"; ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.stroke();
+  }
+  _crackTex[n] = new T.CanvasTexture(cv); return _crackTex[n];
+}
+function sparkleTex() {
+  if (_sparkleTex) return _sparkleTex;
+  const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+  const g = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.4, "rgba(220,245,255,0.5)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(s/2, 4); ctx.lineTo(s/2, s-4); ctx.moveTo(4, s/2); ctx.lineTo(s-4, s/2); ctx.stroke();
+  _sparkleTex = new T.CanvasTexture(cv); return _sparkleTex;
+}
+function puffTex() {
+  if (_puffTex) return _puffTex;
+  const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+  const g = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  g.addColorStop(0, "rgba(255,255,255,0.9)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s); _puffTex = new T.CanvasTexture(cv); return _puffTex;
+}
+function jitter(geo, amt) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + (Math.random()-0.5)*amt, p.getY(i) + (Math.random()-0.5)*amt, p.getZ(i) + (Math.random()-0.5)*amt);
+  geo.computeVertexNormals();
 }
 
-// Eis-Blocker: durchscheinende Hülle um die Frucht; taut Schicht für Schicht durch benachbarte Matches.
+// Eis-Stufen: ändern sich mit dem Level (Aussehen + max. Schichten/Zähigkeit).
+function iceStyleForLevel(lvl) {
+  if (lvl <= 2) return { key: "raureif",    label: "Raureif",        emissive: 0x000000, detail: 0, scale: 0.74, maxLayers: 1 };
+  if (lvl <= 4) return { key: "eis",        label: "Eis",            emissive: 0x113355, detail: 0, scale: 0.76, maxLayers: 2 };
+  if (lvl <= 6) return { key: "frost",      label: "Frost-Kristall", emissive: 0x2277bb, detail: 1, scale: 0.80, maxLayers: 3 };
+  return              { key: "permafrost", label: "Permafrost",     emissive: 0x1144aa, detail: 1, scale: 0.84, maxLayers: 4 };
+}
+
+// Eis-Blocker nach Recherche-Spec: dünn=klar/bläulich (Frucht sichtbar), dick=weiß/opak + viele Risse.
+// Teile: facettierter Kern-Kristall (Frost-Bump) + weißer Rim-Glanz + Riss-Overlay + Funkeln.
 function setIce(cell, layers, style) {
   cell.ice = layers;
   if (style) cell.iceStyle = style;
   const st = cell.iceStyle || iceStyleForLevel(1);
   const g = cell.mesh;
-  if (g.userData.iceMesh) { g.remove(g.userData.iceMesh); g.userData.iceMesh.geometry.dispose(); g.userData.iceMesh = null; }
-  if (layers > 0) {
-    const shell = new T.Mesh(
-      new T.IcosahedronGeometry(st.scale, st.detail),
-      new T.MeshPhysicalMaterial({ color: st.color, emissive: st.emissive, emissiveIntensity: 0.35,
-        transparent: true, opacity: Math.min(0.85, st.op + (layers - 1) * 0.12),
-        roughness: 0.12, metalness: 0, clearcoat: 1, flatShading: true })
-    );
-    g.add(shell); g.userData.iceMesh = shell; g.userData.frozen = true;
-  } else { g.userData.frozen = false; }
+  if (g.userData.iceParts) g.userData.iceParts.forEach(p => { g.remove(p); if (p.geometry) p.geometry.dispose(); });
+  g.userData.iceParts = [];
+  if (layers <= 0) { g.userData.frozen = false; return; }
+  g.userData.frozen = true;
+
+  const t = Math.min(1, (layers - 1) / 3);            // 0 = dünn .. 1 = dick
+  const body = new T.Color(0x7fd3ee).lerp(new T.Color(0xffffff), t * 0.72);
+  const opacity = 0.4 + t * 0.5;                       // dünn durchsichtig -> dick opak
+
+  const geo = new T.IcosahedronGeometry(st.scale, st.detail); jitter(geo, 0.04);
+  const core = new T.Mesh(geo, new T.MeshPhysicalMaterial({
+    color: body, emissive: new T.Color(st.emissive), emissiveIntensity: 0.3,
+    transparent: true, opacity, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.12,
+    bumpMap: frostTex(), bumpScale: 0.05 + t * 0.07, flatShading: true, depthWrite: false, side: T.DoubleSide,
+  }));
+  core.renderOrder = 2; g.add(core); g.userData.iceParts.push(core);
+
+  const rim = new T.Mesh(geo.clone(), new T.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.16 + t * 0.12, blending: T.AdditiveBlending, side: T.BackSide, depthWrite: false }));
+  rim.scale.setScalar(1.07); rim.renderOrder = 2; g.add(rim); g.userData.iceParts.push(rim);
+
+  const crack = new T.Sprite(new T.SpriteMaterial({ map: crackTex(layers),
+    transparent: true, opacity: 0.45 + t * 0.4, blending: T.AdditiveBlending, depthWrite: false }));
+  crack.scale.setScalar(st.scale * 2.0); crack.position.z = 0.1; crack.renderOrder = 3;
+  g.add(crack); g.userData.iceParts.push(crack);
+
+  for (let i = 0; i < 2; i++) {
+    const sp = new T.Sprite(new T.SpriteMaterial({ map: sparkleTex(), transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
+    sp.position.set((Math.random()-0.5)*st.scale, (Math.random()-0.5)*st.scale, 0.2);
+    sp.userData.sparkle = Math.random() * 6.28; sp.scale.setScalar(0.16); sp.renderOrder = 4;
+    g.add(sp); g.userData.iceParts.push(sp);
+  }
+}
+
+// Shatter beim endgültigen Brechen: Eis-Splitter + Schnee-Puff.
+function iceShatter(x, y, style) {
+  const p = worldPos(x, y); beep(880, .09, "triangle"); beep(1240, .06);
+  for (let i = 0; i < 11; i++) {
+    const m = new T.Mesh(new T.TetrahedronGeometry(0.12 + Math.random() * 0.08),
+      new T.MeshStandardMaterial({ color: 0xd6f1ff, transparent: true, opacity: 0.95, roughness: 0.2, metalness: 0, flatShading: true }));
+    m.position.set(p.x, p.y, 0.2); M3.scene.add(m);
+    M3.particles.push({ mesh: m, vx: (Math.random()-0.5)*0.42, vy: Math.random()*0.35+0.06, vz: (Math.random()-0.5)*0.2,
+      life: 0.5 + Math.random()*0.3, maxlife: 0.8, spin: (Math.random()-0.5)*0.45, shard: true });
+  }
+  for (let i = 0; i < 6; i++) {
+    const s = new T.Sprite(new T.SpriteMaterial({ map: puffTex(), transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false }));
+    s.position.set(p.x + (Math.random()-0.5)*0.6, p.y + (Math.random()-0.5)*0.6, 0.3); s.scale.setScalar(0.3); M3.scene.add(s);
+    M3.particles.push({ mesh: s, vx: (Math.random()-0.5)*0.1, vy: Math.random()*0.06, vz: 0, life: 0.45, maxlife: 0.45, grow: true, base: 0.3 });
+  }
 }
 
 function tickM3() {
   if (!M3.renderer) return;
+  const now = performance.now() / 1000;
   M3.scene.traverse(o => {
     if (o.isGroup && o.userData && o.userData.body) {
       const u = o.userData;
       o.scale.x = lerp(o.scale.x, u.baseScale * u.ts, 0.25);
       o.scale.y = o.scale.x; o.scale.z = o.scale.x;
       if (u.tx !== undefined) { o.position.x = lerp(o.position.x, u.tx, 0.28); o.position.y = lerp(o.position.y, u.ty, 0.28); }
-      if (!u.frozen) o.rotation.y += u.spin;
       if (u.ring) u.ring.rotation.x += 0.05;
+    } else if (o.isSprite && o.userData && o.userData.sparkle !== undefined) {
+      o.scale.setScalar(0.14 + 0.07 * Math.sin(now * 5 + o.userData.sparkle));
     }
   });
-  // Partikel (Burst beim Auflösen)
+  // Partikel: Burst (Frucht), Eis-Splitter (shard) und Schnee-Puff (grow)
   for (let i = M3.particles.length - 1; i >= 0; i--) {
     const p = M3.particles[i]; p.life -= 0.016;
     if (p.life <= 0) { M3.scene.remove(p.mesh); M3.particles.splice(i, 1); continue; }
     p.vy -= 0.018; p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
-    const s = Math.max(0.01, p.life * 2.2); p.mesh.scale.setScalar(s);
+    if (p.grow) {
+      const k = 1 - p.life / p.maxlife; p.mesh.scale.setScalar(p.base * (1 + k * 2.2));
+      if (p.mesh.material) p.mesh.material.opacity = 0.85 * (1 - k);
+    } else if (p.shard) {
+      p.mesh.rotation.x += p.spin; p.mesh.rotation.y += p.spin * 0.7;
+      if (p.mesh.material) p.mesh.material.opacity = Math.min(1, p.life / 0.3);
+    } else {
+      p.mesh.scale.setScalar(Math.max(0.01, p.life * 2.2));
+    }
   }
   // Screenshake (skaliert mit Combo/Spezial) — klingt schnell ab
   if (M3.shake > 0.001) {
@@ -284,9 +380,9 @@ function thawAround(clearedSet) {
       const cell = M3.grid[ny][nx];
       if (cell && cell.ice > 0) {
         seen.add(nk);
-        setIce(cell, cell.ice - 1);
-        burst(nx, ny, 0xcde7ff, 4); beep(520, .05, "triangle");
-        if (cell.ice === 0) { M3.iceLeft--; beep(760, .08); }
+        const next = cell.ice - 1;
+        if (next <= 0) { iceShatter(nx, ny, cell.iceStyle); setIce(cell, 0); M3.iceLeft--; }
+        else { setIce(cell, next); burst(nx, ny, 0xcde7ff, 4); beep(520, .05, "triangle"); }
       }
     });
   });
