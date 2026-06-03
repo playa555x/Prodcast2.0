@@ -86,14 +86,14 @@ const MODES = {
 function startMode(id) { M3.mode = MODES[id] || MODES.story; M3.playLevel = null; showTab("m3"); }
 // Story-Level von der Welt-Karte aus starten (bestimmtes Feld).
 function startStory(level) { M3.mode = MODES.story; M3.playLevel = level; showTab("m3"); }
-// Echte Frucht-Designs als Emoji-Textur (klar erkennbar, offline, voll farbig).
+// Echte Spielsteine: per Canvas gezeichnete, glänzende "Candy"-Früchte (Gradient + Glanz + Rim + Schatten).
 const FRUIT = [
-  { name: "apfel",        emoji: "🍎", color: 0xff4356 },
-  { name: "orange",       emoji: "🍊", color: 0xff9f1a },
-  { name: "zitrone",      emoji: "🍋", color: 0xffe04d },
-  { name: "wassermelone", emoji: "🍉", color: 0x7bd64b },
-  { name: "heidelbeere",  emoji: "🫐", color: 0x5a78ff },
-  { name: "traube",       emoji: "🍇", color: 0xb15cff },
+  { name: "apfel",     c1: "#ff8a98", c2: "#ee2a4c", c3: "#9c0f29", color: 0xff4356 },
+  { name: "orange",    c1: "#ffd485", c2: "#ff9120", c3: "#c25c00", color: 0xff9f1a },
+  { name: "zitrone",   c1: "#fff7a6", c2: "#ffd21f", c3: "#bf9500", color: 0xffe04d },
+  { name: "melone",    c1: "#bdf174", c2: "#5fbf3a", c3: "#2c7a1a", color: 0x7bd64b },
+  { name: "blaubeere", c1: "#93a6ff", c2: "#3b56d6", c3: "#1b2880", color: 0x5a78ff },
+  { name: "traube",    c1: "#d7a6ff", c2: "#9b53e0", c3: "#571d92", color: 0xb15cff },
 ];
 
 const _texCache = {};
@@ -109,14 +109,71 @@ function emojiTexture(emoji) {
   _texCache[emoji] = tex; return tex;
 }
 
+// Glänzender Orb (Body-Gradient + Rim-Darkening + Gegenlicht + Glanzlicht), auf Ellipse geclippt.
+function orb(ctx, cx, cy, rx, ry, c1, c2, c3) {
+  const R = Math.max(rx, ry), box = () => ctx.fillRect(cx - rx - 6, cy - ry - 6, rx * 2 + 12, ry * 2 + 12);
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.closePath(); ctx.clip();
+  const g = ctx.createRadialGradient(cx - rx * 0.34, cy - ry * 0.4, R * 0.08, cx, cy, R * 1.12);
+  g.addColorStop(0, c1); g.addColorStop(0.5, c2); g.addColorStop(1, c3); ctx.fillStyle = g; box();
+  const rim = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
+  rim.addColorStop(0, "rgba(0,0,0,0)"); rim.addColorStop(1, "rgba(0,0,0,0.4)"); ctx.fillStyle = rim; box();
+  ctx.globalCompositeOperation = "lighter";
+  const cl = ctx.createRadialGradient(cx + rx * 0.34, cy + ry * 0.46, 0, cx + rx * 0.34, cy + ry * 0.46, R * 0.85);
+  cl.addColorStop(0, "rgba(255,255,255,0.22)"); cl.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = cl; box();
+  ctx.save(); ctx.translate(cx - rx * 0.38, cy - ry * 0.46); ctx.scale(1, 0.62);
+  const sp = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.52);
+  sp.addColorStop(0, "rgba(255,255,255,0.95)"); sp.addColorStop(0.4, "rgba(255,255,255,0.35)"); sp.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sp; ctx.beginPath(); ctx.arc(0, 0, R * 0.52, 0, 7); ctx.fill(); ctx.restore();
+  ctx.restore();
+}
+const _fruitTex = {};
+function fruitTexture(type) { if (!_fruitTex[type]) _fruitTex[type] = drawFruit(type); return _fruitTex[type]; }
+function drawFruit(type) {
+  const s = 256, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+  const cx = 128, cy = 132, r = 82, f = FRUIT[type];
+  // weicher Kontaktschatten
+  ctx.save(); ctx.filter = "blur(7px)"; ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.96, r * 0.82, r * 0.26, 0, 0, 7); ctx.fill(); ctx.restore();
+  const clip = cb => { ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, r, r, 0, 0, 7); ctx.clip(); cb(); ctx.restore(); };
+  if (f.name === "zitrone") {
+    orb(ctx, cx, cy, r * 1.05, r * 0.82, f.c1, f.c2, f.c3);
+    ctx.fillStyle = f.c3; [-1, 1].forEach(d => { ctx.beginPath(); ctx.ellipse(cx + d * r * 1.02, cy, r * 0.1, r * 0.14, 0, 0, 7); ctx.fill(); });
+  } else if (f.name === "traube") {
+    [[0, -0.55], [-0.5, -0.12], [0.5, -0.12], [-0.27, 0.34], [0.27, 0.34], [0, 0.04], [0, 0.66]]
+      .forEach(p => orb(ctx, cx + p[0] * r * 0.92, cy + p[1] * r * 0.96, r * 0.37, r * 0.4, f.c1, f.c2, f.c3));
+    ctx.strokeStyle = "#6b4423"; ctx.lineWidth = 6; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.82); ctx.lineTo(cx, cy - r * 0.5); ctx.stroke();
+  } else {
+    orb(ctx, cx, cy, r, r, f.c1, f.c2, f.c3);
+  }
+  if (f.name === "orange") {
+    clip(() => { ctx.fillStyle = "rgba(150,70,0,0.22)"; for (let i = 0; i < 70; i++) { const a = Math.random() * 7, rr = Math.random() * r * 0.92; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 1.6, 0, 7); ctx.fill(); } });
+    ctx.fillStyle = "#4caf50"; ctx.save(); ctx.translate(cx + 8, cy - r * 0.95); ctx.rotate(0.4); ctx.beginPath(); ctx.ellipse(0, 0, 15, 7, 0, 0, 7); ctx.fill(); ctx.restore();
+  }
+  if (f.name === "melone") {
+    clip(() => { ctx.strokeStyle = "rgba(18,72,12,0.55)"; ctx.lineWidth = 9; ctx.lineCap = "round"; for (let i = -2; i <= 2; i++) { const x = cx + i * r * 0.42; ctx.beginPath(); ctx.moveTo(x, cy - r); ctx.quadraticCurveTo(x + i * 7, cy, x, cy + r); ctx.stroke(); } });
+  }
+  if (f.name === "blaubeere") {
+    clip(() => { ctx.fillStyle = "rgba(255,255,255,0.16)"; for (let i = 0; i < 26; i++) { const a = Math.random() * 7, rr = Math.random() * r * 0.85; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 1.5, 0, 7); ctx.fill(); } });
+    ctx.fillStyle = "#101a5e"; ctx.save(); ctx.translate(cx, cy - r * 0.5); for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(4, -12); ctx.lineTo(-4, -12); ctx.closePath(); ctx.fill(); } ctx.restore();
+  }
+  if (f.name === "apfel") {
+    clip(() => { const d = ctx.createRadialGradient(cx, cy - r * 0.78, 0, cx, cy - r * 0.78, r * 0.5); d.addColorStop(0, "rgba(70,0,12,0.5)"); d.addColorStop(1, "rgba(70,0,12,0)"); ctx.fillStyle = d; ctx.beginPath(); ctx.arc(cx, cy - r * 0.78, r * 0.5, 0, 7); ctx.fill(); });
+    ctx.strokeStyle = "#6b4423"; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.85); ctx.lineTo(cx + 4, cy - r * 1.12); ctx.stroke();
+    ctx.fillStyle = "#46b14e"; ctx.save(); ctx.translate(cx + 18, cy - r * 1.05); ctx.rotate(0.5); ctx.beginPath(); ctx.ellipse(0, 0, 19, 9, 0, 0, 7); ctx.fill(); ctx.restore();
+  }
+  const t = new T.CanvasTexture(cv); t.encoding = T.sRGBEncoding; return t;
+}
+
 function worldPos(x, y) {
   return new T.Vector3((x - (M3.W - 1) / 2) * M3.cs, ((M3.H - 1) / 2 - y) * M3.cs, 0);
 }
 
 function makeFruit(type) {
   const f = FRUIT[type], g = new T.Group();
-  const spr = new T.Sprite(new T.SpriteMaterial({ map: emojiTexture(f.emoji), transparent: true }));
-  spr.scale.set(1.12, 1.12, 1.12); g.add(spr);
+  const spr = new T.Sprite(new T.SpriteMaterial({ map: fruitTexture(type), transparent: true }));
+  spr.scale.set(1.18, 1.18, 1.18); g.add(spr);
   g.userData = { type, body: spr, mat: spr.material, ts: 1, baseScale: 1, spin: 0, frozen: false };
   g.scale.setScalar(0.01); // poppt rein
   return g;
@@ -143,7 +200,7 @@ function startMatch3() {
   M3.target = mode.endless ? Infinity : (mode.target + (mode.id === "story" ? lvl * 120 : 0));
   M3.timed = mode.timed; M3.timeLeft = mode.timed; M3.lastT = performance.now();
   const mount = $("m3mount"); M3.mount = mount;
-  const size = Math.min(440, (mount.clientWidth || 380));
+  const size = Math.min(540, (mount.clientWidth || 400));
   M3.scene = new T.Scene();
   M3.cam = new T.PerspectiveCamera(46, 1, 0.1, 100);
   M3.cam.position.set(0, -0.8, 12.2); M3.cam.lookAt(0, 0.25, 0);
@@ -480,7 +537,7 @@ function hasValidMove() {
 }
 function setFruitType(cell, type) {
   cell.c = type; const b = cell.mesh.userData.body;
-  b.material.map = emojiTexture(FRUIT[type].emoji); b.material.needsUpdate = true;
+  b.material.map = fruitTexture(type); b.material.needsUpdate = true;
 }
 function reshuffle() {
   const cells = [];
@@ -696,7 +753,7 @@ function startBallSort() {
   BS.colors = Math.min(BALL_COLORS.length, 4 + Math.floor((lvl - 1) / 2));
   BS.cap = 4; BS.sel = null; BS.moves = 0; BS.history = []; BS.busy = false;
   const mount = $("bsmount");
-  const w = Math.min(460, (mount.clientWidth || 400)), h = 380;
+  const w = Math.min(560, (mount.clientWidth || 420)), h = 420;
   BS.scene = new T.Scene();
   BS.cam = new T.PerspectiveCamera(45, w / h, 0.1, 100);
   BS.cam.position.set(0, 0.4, 9.5); BS.cam.lookAt(0, -0.2, 0);
