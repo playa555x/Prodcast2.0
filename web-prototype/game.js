@@ -180,8 +180,26 @@ function renderModes() {
   });
 }
 
+const _wPrev = { coins: null, gems: null, energy: null };
 function refreshWallet() {
-  $("coins").textContent = state.coins; $("gems").textContent = state.gems; $("energy").textContent = state.energy;
+  ["coins", "gems", "energy"].forEach(k => {
+    const el = $(k), v = state[k];
+    if (_wPrev[k] !== null && _wPrev[k] !== v) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+    el.textContent = v; _wPrev[k] = v;
+  });
+}
+
+// Konfetti + Sieges-Banner
+function celebrate(text) {
+  const colors = ["#ff5d8f", "#8a5cff", "#ffd166", "#4fd1a5", "#4dabf7", "#ff922b"];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement("div"); c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw"; c.style.background = colors[i % colors.length];
+    const dur = 1.8 + Math.random() * 1.5; c.style.animationDelay = (Math.random() * 0.3) + "s";
+    c.style.animation = `confettiFall ${dur}s linear forwards`;
+    document.body.appendChild(c); setTimeout(() => c.remove(), (dur + 0.4) * 1000);
+  }
+  if (text) { const b = document.createElement("div"); b.className = "banner show"; b.textContent = text; document.body.appendChild(b); setTimeout(() => b.remove(), 1700); }
 }
 
 function refreshHub() {
@@ -290,8 +308,8 @@ function minigameFinished(coins) {
   c.mood = clamp(c.mood + 6, 0, 100);
   c.affection = clamp(c.affection + 2, 0, 100);          // Minispiel-Sieg vertieft auch die Beziehung
   checkTierUp(c);
-  beep(990, .2); toast(`🎉 +${coins} 🪙  ·  +20 🎟️`); save(); refreshWallet();
-  setTimeout(() => showTab("hub"), 1300);
+  beep(990, .2); celebrate(`🎉 +${coins} 🪙 · +20 🎟️`); toast(`🎉 +${coins} 🪙  ·  +20 🎟️`); save(); refreshWallet();
+  setTimeout(() => showTab("hub"), 1500);
 }
 
 // ---------- Energie-Regen ----------

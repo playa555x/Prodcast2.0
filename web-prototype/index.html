@@ -118,6 +118,18 @@
   .overlay .card { max-width: 420px; }
   .overlay h1 { margin: 0 0 6px; } .overlay h1 span { color: var(--accent); }
   .setrow { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #33284a; }
+
+  /* Juice */
+  @keyframes floaty { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(2deg); } }
+  .portrait { animation: floaty 3.2s ease-in-out infinite; }
+  @keyframes bump { 0% { transform: scale(1); } 30% { transform: scale(1.45); color: #fff; } 100% { transform: scale(1); } }
+  .bump { animation: bump .35s ease; display: inline-block; }
+  .confetti { position: fixed; top: -24px; width: 10px; height: 15px; z-index: 200; pointer-events: none; border-radius: 2px; }
+  @keyframes confettiFall { to { transform: translateY(112vh) rotate(900deg); } }
+  .banner { position: fixed; top: 28%; left: 50%; z-index: 201; font-size: 34px; font-weight: 900; color: #fff;
+    text-shadow: 0 4px 24px rgba(255,93,143,.9), 0 0 8px rgba(138,92,255,.8); pointer-events: none; white-space: nowrap; }
+  @keyframes bannerPop { 0% { opacity: 0; transform: translateX(-50%) scale(.5); } 18% { opacity: 1; transform: translateX(-50%) scale(1.15); } 80% { opacity: 1; transform: translateX(-50%) scale(1); } 100% { opacity: 0; transform: translateX(-50%) scale(1.05); } }
+  .banner.show { animation: bannerPop 1.7s ease forwards; }
 </style>
 </head>
 <body>

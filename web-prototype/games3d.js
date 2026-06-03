@@ -126,9 +126,9 @@ function startMatch3() {
   M3.cam = new T.PerspectiveCamera(46, 1, 0.1, 100);
   M3.cam.position.set(0, -0.8, 12.2); M3.cam.lookAt(0, 0.25, 0);
   addLights(M3.scene);
-  const back = new T.Mesh(new T.PlaneGeometry(40, 40),
-    new T.MeshStandardMaterial({ color: 0x241a36, roughness: 1 }));
-  back.position.z = -1.4; back.receiveShadow = true; M3.scene.add(back);
+  const back = new T.Mesh(new T.PlaneGeometry(46, 46),
+    new T.MeshBasicMaterial({ map: gradientTex() }));
+  back.position.z = -1.4; M3.scene.add(back);
   M3.raycaster = new T.Raycaster();
   M3.renderer = makeRenderer(mount, size, size);
   M3.cam.aspect = 1; M3.cam.updateProjectionMatrix();
@@ -319,10 +319,14 @@ function tickM3() {
   for (let i = M3.particles.length - 1; i >= 0; i--) {
     const p = M3.particles[i]; p.life -= 0.016;
     if (p.life <= 0) { M3.scene.remove(p.mesh); M3.particles.splice(i, 1); continue; }
-    p.vy -= 0.018; p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
-    if (p.grow) {
+    if (!p.text) p.vy -= 0.018;                       // Schwerkraft (außer Text-Popups)
+    p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
+    if (p.text) {
+      const k = p.life / p.maxlife; if (p.mesh.material) p.mesh.material.opacity = Math.min(1, k * 1.4);
+      const sc = p.base * (1.3 - 0.3 * k); p.mesh.scale.set(sc * 1.8, sc * 0.9, 1);
+    } else if (p.grow) {
       const k = 1 - p.life / p.maxlife; p.mesh.scale.setScalar(p.base * (1 + k * 2.2));
-      if (p.mesh.material) p.mesh.material.opacity = 0.85 * (1 - k);
+      if (p.mesh.material) p.mesh.material.opacity = 0.9 * (1 - k);
     } else if (p.shard) {
       p.mesh.rotation.x += p.spin; p.mesh.rotation.y += p.spin * 0.7;
       if (p.mesh.material) p.mesh.material.opacity = Math.min(1, p.life / 0.3);
@@ -348,6 +352,38 @@ function burst(x, y, colorHex, n) {
     M3.particles.push({ mesh: m, vx: (Math.random() - 0.5) * 0.32, vy: Math.random() * 0.3 + 0.05,
       vz: Math.random() * 0.2, life: 0.5 + Math.random() * 0.3 });
   }
+}
+
+// --- Juice: schwebende Punkte-Popups, Spezial-Lichtblitz, Gradient-Hintergrund ---
+const _txtCache = {}; let _gradTex;
+function textTexture(text, color) {
+  const key = text + "|" + color; if (_txtCache[key]) return _txtCache[key];
+  const w = 256, h = 128, cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d"); ctx.font = "bold 72px system-ui,Arial,sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.lineWidth = 9; ctx.strokeStyle = "rgba(0,0,0,0.65)"; ctx.strokeText(text, w / 2, h / 2);
+  ctx.fillStyle = color; ctx.fillText(text, w / 2, h / 2);
+  const t = new T.CanvasTexture(cv); _txtCache[key] = t; return t;
+}
+function scorePopup(x, y, text, color, scale) {
+  const m = new T.Sprite(new T.SpriteMaterial({ map: textTexture(text, color), transparent: true, depthWrite: false }));
+  const p = worldPos(x, y); m.position.set(p.x, p.y, 0.6); m.renderOrder = 6;
+  m.scale.set(scale * 1.8, scale * 0.9, 1); M3.scene.add(m);
+  M3.particles.push({ mesh: m, vx: 0, vy: 0.05, vz: 0, life: 0.95, maxlife: 0.95, text: true, base: scale });
+}
+function flashAt(x, y, color) {
+  const s = new T.Sprite(new T.SpriteMaterial({ map: puffTex(), transparent: true, opacity: 0.95,
+    blending: T.AdditiveBlending, depthWrite: false, color: new T.Color(color) }));
+  const p = worldPos(x, y); s.position.set(p.x, p.y, 0.7); s.scale.setScalar(0.6); s.renderOrder = 5; M3.scene.add(s);
+  M3.particles.push({ mesh: s, vx: 0, vy: 0, vz: 0, life: 0.45, maxlife: 0.45, grow: true, base: 1.0 });
+}
+function gradientTex() {
+  if (_gradTex) return _gradTex;
+  const s = 256, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+  const g = ctx.createRadialGradient(s/2, s*0.42, 10, s/2, s/2, s*0.72);
+  g.addColorStop(0, "#4a3470"); g.addColorStop(0.55, "#2a1f3d"); g.addColorStop(1, "#140f1f");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  _gradTex = new T.CanvasTexture(cv); return _gradTex;
 }
 
 function onM3Pointer(e) {
@@ -522,11 +558,15 @@ async function resolveBoard(b) {
       sp.position.set(p.x, p.y, 0); sp.userData.tx = p.x; sp.userData.ty = p.y; M3.scene.add(sp);
       M3.grid[s.p.y][s.p.x] = { c: s.color, s: s.kind, mesh: sp };
     });
-    M3.score += Math.round(n * 12 * (1 + 0.25 * (combo - 1)));
+    const gained = Math.round(n * 12 * (1 + 0.25 * (combo - 1)));
+    M3.score += gained;
+    if (n > 0) scorePopup(b.x, b.y, "+" + gained + (combo > 1 ? " ×" + combo : ""),
+      combo >= 3 ? "#ffd166" : "#ffffff", 0.55 + Math.min(0.55, combo * 0.13));
+    spawns.forEach(s => flashAt(s.p.x, s.p.y, s.kind === "color" ? 0xff5db0 : 0xffe066));
 
     // Juice: "bigger action = bigger feedback" — Screenshake + Hit-Stop bei Spezial/Combo
-    if (spawns.length) { M3.shake = 0.55; beep(180, .18, "sawtooth"); }
-    else if (combo >= 3) { M3.shake = Math.max(M3.shake, 0.28); }
+    if (spawns.length) { M3.shake = 0.6; beep(180, .18, "sawtooth"); }
+    else if (combo >= 3) { M3.shake = Math.max(M3.shake, 0.3); }
     if (combo > 1) beep(700 + combo * 70, .06);
     updateM3Hud();
     await wait(spawns.length ? 320 : 200); // Hit-Stop: kurze Pause beim Spezial-Zünden
