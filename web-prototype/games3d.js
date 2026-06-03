@@ -157,6 +157,16 @@ function startMatch3() {
     }
   }
 
+  // Weitere Blocker nach Bloom-Schedule (nur Story): 🔒 Lock ab L3, 💣 Countdown-Bombe ab L5.
+  M3.bombLeft = 0;
+  if (mode.id === "story") {
+    const occ = new Set();
+    for (let y = 0; y < M3.H; y++) for (let x = 0; x < M3.W; x++) if (M3.grid[y][x] && M3.grid[y][x].ice > 0) occ.add(x + "," + y);
+    const pickFree = () => { for (let t = 0; t < 40; t++) { const x = (rnd() * M3.W) | 0, y = (rnd() * M3.H) | 0, k = x + "," + y; if (!occ.has(k)) { occ.add(k); return [x, y]; } } return null; };
+    if (lvl >= 3) { const n = Math.min(6, lvl - 2); for (let i = 0; i < n; i++) { const p = pickFree(); if (p) setLock(M3.grid[p[1]][p[0]], true); } }
+    if (lvl >= 5) { const n = Math.min(3, lvl - 4); for (let i = 0; i < n; i++) { const p = pickFree(); if (p) { setBomb(M3.grid[p[1]][p[0]], 9 + ((rnd() * 4) | 0)); M3.bombLeft++; } } }
+  }
+
   M3.renderer.domElement.style.cursor = "pointer";
   M3.renderer.domElement.onpointerdown = onM3Pointer;
   ticks.push(tickM3); startLoop();
@@ -350,7 +360,9 @@ function onM3Pointer(e) {
   for (const h of hits) { let o = h.object; while (o && !o.userData?.body) o = o.parent; if (o) { grp = o; break; } }
   if (!grp) return;
   const pos = findCell(grp); if (!pos) return;
-  if (M3.grid[pos.y][pos.x].ice > 0) { beep(180, .1, "square"); toast("🧊 Erst das Eis schmelzen — Match direkt daneben!"); return; }
+  const pcell = M3.grid[pos.y][pos.x];
+  if (pcell.ice > 0) { beep(180, .1, "square"); toast("🧊 Erst das Eis schmelzen — Match direkt daneben!"); return; }
+  if (pcell.locked) { beep(180, .1, "square"); toast("🔒 Erst das Schloss knacken — Match direkt daneben!"); return; }
   if (!M3.sel) { M3.sel = pos; highlight(grp, true); beep(420, .05); return; }
   const a = M3.sel, b = pos; const aMesh = M3.grid[a.y][a.x].mesh; highlight(aMesh, false); M3.sel = null;
   if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) !== 1) { if (a.x !== b.x || a.y !== b.y) { M3.sel = b; highlight(grp, true); } return; }
@@ -369,12 +381,15 @@ async function doSwap(a, b) {
   M3.busy = true;
   swapCells(a, b);
   await wait(180);
-  if (await resolveBoard(b)) { if (M3.moves !== Infinity) M3.moves--; beep(620, .07); }
+  let valid = false;
+  if (await resolveBoard(b)) { valid = true; if (M3.moves !== Infinity) M3.moves--; beep(620, .07); }
   else { swapCells(a, b); beep(200, .08, "square"); await wait(160); }
   const playable = ensurePlayable();
+  const exploded = valid ? tickBombs() : false;   // Bomben nur bei gültigem Zug runterzählen
   updateM3Hud();
   M3.busy = false;
   const mode = M3.mode;
+  if (exploded) { toast("💣 Bombe explodiert!"); beep(120, .3, "sawtooth"); endMode(false); return; }
   if (!mode.endless && M3.score >= M3.target && M3.iceLeft <= 0) endMode(true);
   else if (!mode.endless && M3.moves <= 0) endMode(false);
   else if (mode.endless && !mode.timed && !playable) endMode(true);  // Endlos: stuck -> auszahlen
@@ -432,7 +447,7 @@ function swapCells(a, b) {
 function setTarget(cell, x, y) { const p = worldPos(x, y); cell.mesh.userData.tx = p.x; cell.mesh.userData.ty = p.y; }
 
 // Farbe einer Zelle fürs Matching; vereiste (frozen) Zellen sind nicht matchbar (-1).
-function cAt(x, y) { const cell = M3.grid[y][x]; return (!cell || cell.c == null || cell.ice > 0) ? -1 : cell.c; }
+function cAt(x, y) { const cell = M3.grid[y][x]; return (!cell || cell.c == null || cell.ice > 0 || cell.locked) ? -1 : cell.c; }
 function runs() {
   const out = [];
   for (let y = 0; y < M3.H; y++) { let x = 0; while (x < M3.W) {
@@ -461,6 +476,8 @@ function thawAround(clearedSet) {
         const next = cell.ice - 1;
         if (next <= 0) { iceShatter(nx, ny, cell.iceStyle); setIce(cell, 0); M3.iceLeft--; }
         else { setIce(cell, next); burst(nx, ny, 0xcde7ff, 4); beep(520, .05, "triangle"); }
+      } else if (cell && cell.locked) {       // Schloss durch Nachbar-Match knacken
+        seen.add(nk); setLock(cell, false); burst(nx, ny, 0xffd166, 5); beep(640, .06);
       }
     });
   });
@@ -543,6 +560,44 @@ function updateM3Hud() {
   $("m3right").innerHTML = M3.timed ? `⏱️ <b>${Math.ceil(M3.timeLeft)}s</b>` : `Züge: <b>${M3.moves === Infinity ? "∞" : M3.moves}</b>`;
 }
 function m3Finish() { endMode(M3.mode && M3.mode.endless ? true : false); }
+
+// --- Weitere Blocker: Lock (Schloss) & Countdown-Bombe ---
+const _numTex = {};
+function numberTexture(n) {
+  if (_numTex[n]) return _numTex[n];
+  const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.font = "bold 44px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.7)"; ctx.shadowBlur = 5; ctx.fillText(String(n), s / 2, s / 2 + 2);
+  _numTex[n] = new T.CanvasTexture(cv); return _numTex[n];
+}
+function setLock(cell, on) {
+  cell.locked = on; const g = cell.mesh;
+  if (g.userData.lockMesh) { g.remove(g.userData.lockMesh); g.userData.lockMesh = null; }
+  if (on) {
+    const s = new T.Sprite(new T.SpriteMaterial({ map: emojiTexture("🔒"), transparent: true, depthWrite: false }));
+    s.scale.setScalar(0.7); s.position.z = 0.18; s.renderOrder = 3; g.add(s); g.userData.lockMesh = s;
+  }
+}
+function setBomb(cell, n) {
+  cell.bomb = n; const g = cell.mesh;
+  if (g.userData.bombParts) g.userData.bombParts.forEach(p => { g.remove(p); if (p.geometry) p.geometry.dispose(); });
+  g.userData.bombParts = [];
+  if (n > 0) {
+    const ring = new T.Mesh(new T.TorusGeometry(0.52, 0.07, 8, 22),
+      new T.MeshStandardMaterial({ color: 0x111111, emissive: 0xff3322, emissiveIntensity: 0.6 }));
+    ring.renderOrder = 2; g.add(ring); g.userData.bombParts.push(ring);
+    const num = new T.Sprite(new T.SpriteMaterial({ map: numberTexture(n), transparent: true, depthWrite: false }));
+    num.scale.setScalar(0.6); num.position.set(0.28, 0.3, 0.25); num.renderOrder = 4; g.add(num); g.userData.bombParts.push(num);
+  }
+}
+function tickBombs() {           // pro gültigem Zug: Countdown −1; 0 -> Explosion (verloren)
+  let exploded = false;
+  for (let y = 0; y < M3.H; y++) for (let x = 0; x < M3.W; x++) {
+    const c = M3.grid[y][x];
+    if (c && c.bomb > 0) { setBomb(c, c.bomb - 1); if (c.bomb <= 0) exploded = true; }
+  }
+  return exploded;
+}
 
 // =====================================================================
 //  BALL-SORT (3D, Glas-Reagenzgläser)
