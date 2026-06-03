@@ -61,7 +61,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 //  MATCH-3 (3D-Früchte)
 // =====================================================================
 const M3 = {
-  W: 8, H: 8, C: 6, cs: 1.18, grid: [], sel: null, score: 0, moves: 20, target: 800,
+  W: 8, H: 8, C: 5, cs: 1.18, grid: [], sel: null, score: 0, moves: 20, target: 800,
   busy: false, scene: null, cam: null, renderer: null, raycaster: null, mount: null,
   particles: [], shake: 0, camBase: new THREE.Vector3(0, -0.8, 12.2), iceLeft: 0,
   mode: null, rng: Math.random, timed: 0, timeLeft: 0, lastT: 0, ended: false,
@@ -86,15 +86,18 @@ const MODES = {
 function startMode(id) { M3.mode = MODES[id] || MODES.story; M3.playLevel = null; showTab("m3"); }
 // Story-Level von der Welt-Karte aus starten (bestimmtes Feld).
 function startStory(level) { M3.mode = MODES.story; M3.playLevel = level; showTab("m3"); }
-// Echte Spielsteine: per Canvas gezeichnete, glänzende "Candy"-Früchte (Gradient + Glanz + Rim + Schatten).
+// Echte Spielsteine: CC0-Candy-Sprites (OpenGameArt "Candy Match 3" von MELLE, CC0) — glänzend, einheitlich.
 const FRUIT = [
-  { name: "apfel",     c1: "#ff8a98", c2: "#ee2a4c", c3: "#9c0f29", color: 0xff4356 },
-  { name: "orange",    c1: "#ffd485", c2: "#ff9120", c3: "#c25c00", color: 0xff9f1a },
-  { name: "zitrone",   c1: "#fff7a6", c2: "#ffd21f", c3: "#bf9500", color: 0xffe04d },
-  { name: "melone",    c1: "#bdf174", c2: "#5fbf3a", c3: "#2c7a1a", color: 0x7bd64b },
-  { name: "blaubeere", c1: "#93a6ff", c2: "#3b56d6", c3: "#1b2880", color: 0x5a78ff },
-  { name: "traube",    c1: "#d7a6ff", c2: "#9b53e0", c3: "#571d92", color: 0xb15cff },
+  { name: "kirsche", color: 0xee2a4c },
+  { name: "gelb",    color: 0xffb01f },
+  { name: "gruen",   color: 0x33b81f },
+  { name: "blau",    color: 0x2f8fe0 },
+  { name: "lila",    color: 0xa83fd0 },
 ];
+const C = window.CANDY || {};
+const _candyTex = ["fruit0", "fruit1", "fruit2", "fruit3", "fruit4"]
+  .map(k => { const t = new T.TextureLoader().load(C[k]); t.encoding = T.sRGBEncoding; return t; });
+const _colorBombTex = (() => { const t = new T.TextureLoader().load(C.colorbomb); t.encoding = T.sRGBEncoding; return t; })();
 
 const _texCache = {};
 function emojiTexture(emoji) {
@@ -127,8 +130,7 @@ function orb(ctx, cx, cy, rx, ry, c1, c2, c3) {
   ctx.fillStyle = sp; ctx.beginPath(); ctx.arc(0, 0, R * 0.52, 0, 7); ctx.fill(); ctx.restore();
   ctx.restore();
 }
-const _fruitTex = {};
-function fruitTexture(type) { if (!_fruitTex[type]) _fruitTex[type] = drawFruit(type); return _fruitTex[type]; }
+function fruitTexture(type) { return _candyTex[type]; }
 function drawFruit(type) {
   const s = 256, cv = document.createElement("canvas"); cv.width = cv.height = s; const ctx = cv.getContext("2d");
   const cx = 128, cy = 132, r = 82, f = FRUIT[type];
@@ -182,6 +184,7 @@ function makeFruit(type) {
 function makeSpecial(type, kind) {
   const g = makeFruit(type);
   g.userData.kind = kind;
+  if (kind === "color") { g.userData.body.material.map = _colorBombTex; g.userData.body.material.needsUpdate = true; }
   const ring = new T.Mesh(new T.TorusGeometry(0.6, 0.07, 10, 28),
     new T.MeshStandardMaterial({ color: 0xffffff, emissive: kind === "color" ? 0xff5db0 : 0xffe066, emissiveIntensity: 2.6 }));
   g.add(ring); g.userData.ring = ring;
