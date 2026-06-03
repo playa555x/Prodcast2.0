@@ -43,6 +43,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const M3 = {
   W: 8, H: 8, C: 6, cs: 1.18, grid: [], sel: null, score: 0, moves: 20, target: 800,
   busy: false, scene: null, cam: null, renderer: null, raycaster: null, mount: null,
+  particles: [], shake: 0, camBase: new THREE.Vector3(0, -0.8, 12.2), iceLeft: 0,
 };
 // Früchte: Farbe + Form + Deko
 const FRUIT = [
@@ -118,19 +119,48 @@ function startMatch3() {
       M3.grid[y][x] = newCell(c, x, y, true);
     } }
 
+  // Hindernis: Eis-Blocker säen (skaliert mit Level). Mehrschichtig -> mehrere Matches nötig.
+  M3.particles = []; M3.shake = 0; M3.iceLeft = 0;
+  const iceCount = Math.min(14, 3 + lvl * 2);
+  const spots = new Set();
+  for (let i = 0; i < iceCount; i++) {
+    const x = (Math.random() * M3.W) | 0, y = (Math.random() * M3.H) | 0, k = x + "," + y;
+    if (spots.has(k)) continue; spots.add(k);
+    const layers = 1 + ((Math.random() * Math.min(3, 1 + Math.floor(lvl / 2))) | 0);
+    setIce(M3.grid[y][x], layers); M3.iceLeft++;
+  }
+
   M3.renderer.domElement.style.cursor = "pointer";
   M3.renderer.domElement.onpointerdown = onM3Pointer;
   ticks.push(tickM3); startLoop();
   updateM3Hud();
 }
 
-function newCell(type, x, y, dropFromTop) {
+function newCell(type, x, y, dropFromTop, ice) {
   const mesh = makeFruit(type);
   const p = worldPos(x, y);
   mesh.position.set(p.x, dropFromTop ? p.y + 6 : p.y, 0);
   mesh.userData.tx = p.x; mesh.userData.ty = p.y;
   M3.scene.add(mesh);
-  return { c: type, s: null, mesh };
+  const cell = { c: type, s: null, mesh, ice: 0 };
+  if (ice) setIce(cell, ice);
+  return cell;
+}
+
+// Eis-Blocker: durchscheinende Hülle um die Frucht; Schichten 1–3 (durch benachbarte Matches auftauen)
+function setIce(cell, layers) {
+  cell.ice = layers;
+  const g = cell.mesh;
+  if (g.userData.iceMesh) { g.remove(g.userData.iceMesh); g.userData.iceMesh = null; }
+  if (layers > 0) {
+    const shell = new T.Mesh(
+      new T.IcosahedronGeometry(0.72, 0),
+      new T.MeshPhysicalMaterial({ color: 0xcde7ff, transparent: true, opacity: 0.32 + layers * 0.16,
+        roughness: 0.15, metalness: 0, clearcoat: 1, flatShading: true })
+    );
+    g.add(shell); g.userData.iceMesh = shell;
+    g.userData.frozen = true;
+  } else { g.userData.frozen = false; }
 }
 
 function tickM3() {
@@ -141,11 +171,35 @@ function tickM3() {
       o.scale.x = lerp(o.scale.x, u.baseScale * u.ts, 0.25);
       o.scale.y = o.scale.x; o.scale.z = o.scale.x;
       if (u.tx !== undefined) { o.position.x = lerp(o.position.x, u.tx, 0.28); o.position.y = lerp(o.position.y, u.ty, 0.28); }
-      o.rotation.y += u.spin;
-      if (u.ring) o.userData.ring.rotation.x += 0.05;
+      if (!u.frozen) o.rotation.y += u.spin;
+      if (u.ring) u.ring.rotation.x += 0.05;
     }
   });
+  // Partikel (Burst beim Auflösen)
+  for (let i = M3.particles.length - 1; i >= 0; i--) {
+    const p = M3.particles[i]; p.life -= 0.016;
+    if (p.life <= 0) { M3.scene.remove(p.mesh); M3.particles.splice(i, 1); continue; }
+    p.vy -= 0.018; p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
+    const s = Math.max(0.01, p.life * 2.2); p.mesh.scale.setScalar(s);
+  }
+  // Screenshake (skaliert mit Combo/Spezial) — klingt schnell ab
+  if (M3.shake > 0.001) {
+    M3.cam.position.set(M3.camBase.x + (Math.random() - 0.5) * M3.shake,
+                        M3.camBase.y + (Math.random() - 0.5) * M3.shake, M3.camBase.z);
+    M3.shake *= 0.86;
+  } else { M3.cam.position.copy(M3.camBase); }
   M3.renderer.render(M3.scene, M3.cam);
+}
+
+function burst(x, y, colorHex, n) {
+  for (let i = 0; i < (n || 5); i++) {
+    const m = new T.Mesh(new T.SphereGeometry(0.13, 8, 6),
+      new T.MeshBasicMaterial({ color: colorHex }));
+    const p = worldPos(x, y); m.position.set(p.x, p.y, 0.3);
+    M3.scene.add(m);
+    M3.particles.push({ mesh: m, vx: (Math.random() - 0.5) * 0.32, vy: Math.random() * 0.3 + 0.05,
+      vz: Math.random() * 0.2, life: 0.5 + Math.random() * 0.3 });
+  }
 }
 
 function onM3Pointer(e) {
@@ -158,6 +212,7 @@ function onM3Pointer(e) {
   for (const h of hits) { let o = h.object; while (o && !o.userData?.body) o = o.parent; if (o) { grp = o; break; } }
   if (!grp) return;
   const pos = findCell(grp); if (!pos) return;
+  if (M3.grid[pos.y][pos.x].ice > 0) { beep(180, .1, "square"); toast("🧊 Erst das Eis schmelzen — Match direkt daneben!"); return; }
   if (!M3.sel) { M3.sel = pos; highlight(grp, true); beep(420, .05); return; }
   const a = M3.sel, b = pos; const aMesh = M3.grid[a.y][a.x].mesh; highlight(aMesh, false); M3.sel = null;
   if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) !== 1) { if (a.x !== b.x || a.y !== b.y) { M3.sel = b; highlight(grp, true); } return; }
@@ -181,7 +236,8 @@ async function doSwap(a, b) {
   else { swapCells(a, b); beep(200, .08, "square"); await wait(160); }
   updateM3Hud();
   M3.busy = false;
-  if (M3.score >= M3.target) endM3(true); else if (M3.moves <= 0) endM3(false);
+  if (M3.score >= M3.target && M3.iceLeft <= 0) endM3(true);
+  else if (M3.moves <= 0) endM3(false);
 }
 function swapCells(a, b) {
   const ca = M3.grid[a.y][a.x], cb = M3.grid[b.y][b.x];
@@ -190,19 +246,39 @@ function swapCells(a, b) {
 }
 function setTarget(cell, x, y) { const p = worldPos(x, y); cell.mesh.userData.tx = p.x; cell.mesh.userData.ty = p.y; }
 
+// Farbe einer Zelle fürs Matching; vereiste (frozen) Zellen sind nicht matchbar (-1).
+function cAt(x, y) { const cell = M3.grid[y][x]; return (!cell || cell.c == null || cell.ice > 0) ? -1 : cell.c; }
 function runs() {
   const out = [];
   for (let y = 0; y < M3.H; y++) { let x = 0; while (x < M3.W) {
-    const c = M3.grid[y][x]?.c; if (c == null || c < 0) { x++; continue; }
-    let s = x; while (x < M3.W && M3.grid[y][x]?.c === c) x++;
+    const c = cAt(x, y); if (c < 0) { x++; continue; }
+    let s = x; while (x < M3.W && cAt(x, y) === c) x++;
     if (x - s >= 3) { const r = { cells: [], h: true, color: c }; for (let i = s; i < x; i++) r.cells.push({ x: i, y }); out.push(r); }
   }}
   for (let x = 0; x < M3.W; x++) { let y = 0; while (y < M3.H) {
-    const c = M3.grid[y][x]?.c; if (c == null || c < 0) { y++; continue; }
-    let s = y; while (y < M3.H && M3.grid[y][x]?.c === c) y++;
+    const c = cAt(x, y); if (c < 0) { y++; continue; }
+    let s = y; while (y < M3.H && cAt(x, y) === c) y++;
     if (y - s >= 3) { const r = { cells: [], h: false, color: c }; for (let i = s; i < y; i++) r.cells.push({ x, y: i }); out.push(r); }
   }}
   return out;
+}
+// Eis benachbart zu geräumten Zellen um eine Schicht auftauen.
+function thawAround(clearedSet) {
+  const seen = new Set();
+  clearedSet.forEach(k => {
+    const [x, y] = k.split(",").map(Number);
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx, dy]) => {
+      const nx = x + dx, ny = y + dy, nk = nx + "," + ny;
+      if (nx < 0 || nx >= M3.W || ny < 0 || ny >= M3.H || seen.has(nk)) return;
+      const cell = M3.grid[ny][nx];
+      if (cell && cell.ice > 0) {
+        seen.add(nk);
+        setIce(cell, cell.ice - 1);
+        burst(nx, ny, 0xcde7ff, 4); beep(520, .05, "triangle");
+        if (cell.ice === 0) { M3.iceLeft--; beep(760, .08); }
+      }
+    });
+  });
 }
 function effect(x, y, kind, t) {
   const out = [];
@@ -227,11 +303,15 @@ async function resolveBoard(b) {
     for (const r of rs) for (const p of r.cells) { const k = p.x + "," + p.y; if (!cleared.has(k)) { cleared.add(k); const cell = M3.grid[p.y][p.x]; if (cell && cell.s) queue.push({ x: p.x, y: p.y, s: cell.s, t: cell.c }); } }
     while (queue.length) { const q = queue.shift(); for (const e of effect(q.x, q.y, q.s, q.t)) { const k = e.x + "," + e.y; if (!cleared.has(k)) { cleared.add(k); const cell = M3.grid[e.y][e.x]; if (cell && cell.s) queue.push({ x: e.x, y: e.y, s: cell.s, t: cell.c }); } } }
 
+    // benachbartes Eis auftauen (eine Schicht pro Auflöse-Schritt)
+    thawAround(cleared);
+
     let n = 0;
     cleared.forEach(k => {
       const [x, y] = k.split(",").map(Number);
       if (spawnKeys.has(k)) return;
       const cell = M3.grid[y][x]; if (!cell) return;
+      burst(x, y, FRUIT[cell.c] ? FRUIT[cell.c].color : 0xffffff, 5);
       popOut(cell.mesh); M3.grid[y][x] = null; n++;
     });
     spawns.forEach(s => {
@@ -241,9 +321,13 @@ async function resolveBoard(b) {
       M3.grid[s.p.y][s.p.x] = { c: s.color, s: s.kind, mesh: sp };
     });
     M3.score += Math.round(n * 12 * (1 + 0.25 * (combo - 1)));
+
+    // Juice: "bigger action = bigger feedback" — Screenshake + Hit-Stop bei Spezial/Combo
+    if (spawns.length) { M3.shake = 0.55; beep(180, .18, "sawtooth"); }
+    else if (combo >= 3) { M3.shake = Math.max(M3.shake, 0.28); }
     if (combo > 1) beep(700 + combo * 70, .06);
     updateM3Hud();
-    await wait(200);
+    await wait(spawns.length ? 320 : 200); // Hit-Stop: kurze Pause beim Spezial-Zünden
     gravity();
     await wait(220);
     rs = runs();
@@ -265,7 +349,7 @@ function gravity() {
     for (; y >= 0; y--) M3.grid[y][x] = newCell((Math.random() * M3.C) | 0, x, y, true);
   }
 }
-function updateM3Hud() { $("m3score").textContent = M3.score; $("m3moves").textContent = M3.moves; $("m3target").textContent = M3.target; }
+function updateM3Hud() { $("m3score").textContent = M3.score; $("m3moves").textContent = M3.moves; $("m3target").textContent = M3.target; $("m3ice").textContent = M3.iceLeft; }
 function endM3(won) {
   M3.busy = true;
   if (won) {
