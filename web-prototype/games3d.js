@@ -12,8 +12,8 @@ function startLoop() { if (!rafId) loop(); }
 window.stopGame3D = function () {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   ticks = [];
-  if (M3.renderer) { M3.renderer.dispose(); M3.renderer = null; }
-  if (BS.renderer) { BS.renderer.dispose(); BS.renderer = null; }
+  if (M3.renderer) { M3.renderer.dispose(); M3.renderer = null; M3.composer = null; }
+  if (BS.renderer) { BS.renderer.dispose(); BS.renderer = null; BS.composer = null; }
 };
 
 function makeRenderer(mount, w, h) {
@@ -22,8 +22,28 @@ function makeRenderer(mount, w, h) {
   r.setSize(w, h);
   r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
   r.outputEncoding = T.sRGBEncoding;
+  r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
   mount.innerHTML = ""; mount.appendChild(r.domElement);
   return r;
+}
+// Image-Based-Lighting (weiche Reflexe auf Eis/Glas) — einmal pro Renderer.
+function makeEnv(renderer) {
+  const p = new T.PMREMGenerator(renderer);
+  const tex = p.fromScene(new T.RoomEnvironment(), 0.04).texture;
+  p.dispose(); return tex;
+}
+// Post-Processing: Bloom-Glow + Vignette + FXAA.
+function makeComposer(renderer, scene, cam, w, h) {
+  const c = new T.EffectComposer(renderer);
+  c.addPass(new T.RenderPass(scene, cam));
+  c.addPass(new T.UnrealBloomPass(new T.Vector2(w / 2, h / 2), 0.5, 0.35, 0.9));
+  const vign = new T.ShaderPass(T.VignetteShader);
+  vign.uniforms.offset.value = 1.05; vign.uniforms.darkness.value = 1.15; c.addPass(vign);
+  const fxaa = new T.ShaderPass(T.FXAAShader);
+  const pr = renderer.getPixelRatio();
+  fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr)); c.addPass(fxaa);
+  c.setSize(w, h);
+  return c;
 }
 function addLights(scene) {
   scene.add(new T.AmbientLight(0xffffff, 0.55));
@@ -103,8 +123,8 @@ function makeFruit(type) {
 function makeSpecial(type, kind) {
   const g = makeFruit(type);
   g.userData.kind = kind;
-  const ring = new T.Mesh(new T.TorusGeometry(0.6, 0.06, 8, 24),
-    new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.9 }));
+  const ring = new T.Mesh(new T.TorusGeometry(0.6, 0.07, 10, 28),
+    new T.MeshStandardMaterial({ color: 0xffffff, emissive: kind === "color" ? 0xff5db0 : 0xffe066, emissiveIntensity: 2.6 }));
   g.add(ring); g.userData.ring = ring;
   const badge = new T.Sprite(new T.SpriteMaterial({ map: emojiTexture(kind === "color" ? "💥" : "🚀"), transparent: true }));
   badge.scale.set(0.62, 0.62, 0.62); badge.position.set(0.28, 0.32, 0.2); g.add(badge);
@@ -132,6 +152,8 @@ function startMatch3() {
   M3.raycaster = new T.Raycaster();
   M3.renderer = makeRenderer(mount, size, size);
   M3.cam.aspect = 1; M3.cam.updateProjectionMatrix();
+  M3.scene.environment = makeEnv(M3.renderer);
+  M3.composer = makeComposer(M3.renderer, M3.scene, M3.cam, size, size);
 
   // Board ohne Start-Matches
   M3.grid = [];
@@ -251,8 +273,8 @@ function setIce(cell, layers, style) {
   g.userData.frozen = true;
 
   const t = Math.min(1, (layers - 1) / 3);            // 0 = dünn .. 1 = dick
-  const body = new T.Color(0x7fd3ee).lerp(new T.Color(0xffffff), t * 0.72);
-  const opacity = 0.4 + t * 0.5;                       // dünn durchsichtig -> dick opak
+  const body = new T.Color(0x6fc8ec).lerp(new T.Color(0xeaf6ff), t * 0.5);
+  const opacity = 0.38 + t * 0.42;                     // dünn durchsichtig -> dick opak
 
   const geo = new T.IcosahedronGeometry(st.scale, st.detail); jitter(geo, 0.04);
   const core = new T.Mesh(geo, new T.MeshPhysicalMaterial({
@@ -319,11 +341,14 @@ function tickM3() {
   for (let i = M3.particles.length - 1; i >= 0; i--) {
     const p = M3.particles[i]; p.life -= 0.016;
     if (p.life <= 0) { M3.scene.remove(p.mesh); M3.particles.splice(i, 1); continue; }
-    if (!p.text) p.vy -= 0.018;                       // Schwerkraft (außer Text-Popups)
+    if (!p.text && !p.ring) p.vy -= 0.018;            // Schwerkraft (außer Text/Ring)
     p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz;
     if (p.text) {
       const k = p.life / p.maxlife; if (p.mesh.material) p.mesh.material.opacity = Math.min(1, k * 1.4);
       const sc = p.base * (1.3 - 0.3 * k); p.mesh.scale.set(sc * 1.8, sc * 0.9, 1);
+    } else if (p.ring) {
+      const k = 1 - p.life / p.maxlife; p.mesh.scale.setScalar(1 + k * 6);
+      if (p.mesh.material) p.mesh.material.opacity = 0.9 * (1 - k);
     } else if (p.grow) {
       const k = 1 - p.life / p.maxlife; p.mesh.scale.setScalar(p.base * (1 + k * 2.2));
       if (p.mesh.material) p.mesh.material.opacity = 0.9 * (1 - k);
@@ -340,7 +365,7 @@ function tickM3() {
                         M3.camBase.y + (Math.random() - 0.5) * M3.shake, M3.camBase.z);
     M3.shake *= 0.86;
   } else { M3.cam.position.copy(M3.camBase); }
-  M3.renderer.render(M3.scene, M3.cam);
+  M3.composer.render();
 }
 
 function burst(x, y, colorHex, n) {
@@ -376,6 +401,12 @@ function flashAt(x, y, color) {
     blending: T.AdditiveBlending, depthWrite: false, color: new T.Color(color) }));
   const p = worldPos(x, y); s.position.set(p.x, p.y, 0.7); s.scale.setScalar(0.6); s.renderOrder = 5; M3.scene.add(s);
   M3.particles.push({ mesh: s, vx: 0, vy: 0, vz: 0, life: 0.45, maxlife: 0.45, grow: true, base: 1.0 });
+}
+function ringShock(x, y, color) {
+  const m = new T.Mesh(new T.RingGeometry(0.12, 0.34, 36),
+    new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, side: T.DoubleSide, blending: T.AdditiveBlending, depthWrite: false }));
+  const p = worldPos(x, y); m.position.set(p.x, p.y, 0.55); m.renderOrder = 5; M3.scene.add(m);
+  M3.particles.push({ mesh: m, vx: 0, vy: 0, vz: 0, life: 0.5, maxlife: 0.5, ring: true });
 }
 function gradientTex() {
   if (_gradTex) return _gradTex;
@@ -562,7 +593,10 @@ async function resolveBoard(b) {
     M3.score += gained;
     if (n > 0) scorePopup(b.x, b.y, "+" + gained + (combo > 1 ? " ×" + combo : ""),
       combo >= 3 ? "#ffd166" : "#ffffff", 0.55 + Math.min(0.55, combo * 0.13));
-    spawns.forEach(s => flashAt(s.p.x, s.p.y, s.kind === "color" ? 0xff5db0 : 0xffe066));
+    spawns.forEach(s => {
+      const col = s.kind === "color" ? 0xff5db0 : 0xffe066;
+      flashAt(s.p.x, s.p.y, col); ringShock(s.p.x, s.p.y, col);
+    });
 
     // Juice: "bigger action = bigger feedback" — Screenshake + Hit-Stop bei Spezial/Combo
     if (spawns.length) { M3.shake = 0.6; beep(180, .18, "sawtooth"); }
@@ -665,6 +699,8 @@ function startBallSort() {
   floor.rotation.x = -Math.PI / 2; floor.position.y = -BS.cap * 0.45 - 0.35; floor.receiveShadow = true; BS.scene.add(floor);
   BS.raycaster = new T.Raycaster();
   BS.renderer = makeRenderer(mount, w, h);
+  BS.scene.environment = makeEnv(BS.renderer);
+  BS.composer = makeComposer(BS.renderer, BS.scene, BS.cam, w, h);
 
   // Logik: gelöst -> mischen mit legalen Einzelzügen
   BS.tubes = [];
@@ -708,7 +744,7 @@ function tickBS() {
   BS.scene.traverse(o => { if (o.isMesh && o.userData && o.userData.tx !== undefined && o.userData.col !== undefined) {
     o.position.x = lerp(o.position.x, o.userData.tx, 0.2); o.position.y = lerp(o.position.y, o.userData.ty, 0.2);
   }});
-  BS.renderer.render(BS.scene, BS.cam);
+  BS.composer.render();
 }
 function canMove(from, to) {
   if (from === to) return false; const s = BS.tubes[from], d = BS.tubes[to];
