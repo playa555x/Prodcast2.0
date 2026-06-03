@@ -89,12 +89,29 @@ function enterGame(tier) {
 // ---------- Tabs ----------
 function showTab(tab) {
   if (typeof stopGame3D === "function") stopGame3D();
-  ["hub", "m3", "bs", "roster", "gal", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
+  ["hub", "modes", "m3", "bs", "roster", "gal", "set"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== tab));
   if (tab === "hub") refreshHub();
+  if (tab === "modes") renderModes();
   if (tab === "m3") startMatch3();
   if (tab === "bs") startBallSort();
   if (tab === "roster") renderRoster();
   if (tab === "gal") renderGallery();
+}
+
+// Modus-Auswahl-Hub (datengetrieben aus games3d.js — MODES). Klick startet den Modus.
+function renderModes() {
+  const grid = $("modeGrid"); grid.innerHTML = "";
+  Object.values(window.M3MODES || {}).forEach(m => {
+    let extra = "";
+    if (m.id === "story") extra = `Level ${state.m3level || 1}`;
+    else if (m.id === "endless") extra = `Best ${state.endlessBest || 0}`;
+    else if (m.id === "daily") extra = (state.dailyDone === window.dateSeedVal() ? "heute ✓ · " : "") + `Best ${state.dailyBest || 0}`;
+    const d = document.createElement("div");
+    d.className = "rchar";
+    d.innerHTML = `<div class="rface">${m.icon}</div><div><b>${m.name}</b></div><div class="muted">${m.desc}</div><div class="muted">${extra}</div>`;
+    d.onclick = () => { beep(520, .08); window.startMode(m.id); };
+    grid.appendChild(d);
+  });
 }
 
 function refreshWallet() {

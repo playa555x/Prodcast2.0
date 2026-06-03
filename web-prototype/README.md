@@ -16,6 +16,21 @@ python3 -m http.server 8080
 # dann http://localhost:8080 öffnen
 ```
 
+## Modus-System (datengetrieben, geteilter Match-3-Kern)
+
+Nach `docs/RESEARCH_MODES.md` aufgebaut: **ein** Match-3-Kern, die Modi unterscheiden sich nur über
+**Daten** (Ziele/Regeln/Modifier), nicht über Code. Auswahl im Modus-Hub („🍬 Match-3"):
+
+| Modus | Regeln |
+|---|---|
+| 📖 **Story** | Zielpunktzahl + Eis räumen, Zug-Limit, Level-Progression (Eis & Ziel wachsen) |
+| 📅 **Daily** | Täglich gleiches Board (Datums-**Seed**, reproduzierbar), Zug-Limit, Bestwert |
+| ♾️ **Endlos** | Keine Zug-Grenze, kein Ziel — spielen bis kein Zug mehr möglich; Bestwert |
+| ⏱️ **Time Attack** | 60 Sekunden, maximale Punkte; Timer-HUD |
+
+Enthält auch `hasValidMove()` + **Auto-Shuffle** (aus der Architektur-Recherche): gibt es keinen gültigen
+Zug mehr, wird automatisch neu gemischt (bzw. Endlos endet und zahlt aus).
+
 ## Was funktioniert
 
 - **Start-/Age-Gate**: Auswahl SFW / 18+ (Demo — beide nur Platzhalter), Altersbestätigung für 18+.

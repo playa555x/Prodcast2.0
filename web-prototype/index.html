@@ -147,7 +147,7 @@
 <div class="app">
   <div class="tabbtns">
     <button class="primary" onclick="showTab('hub')">❤️ Hub</button>
-    <button onclick="showTab('m3')">🍬 Match-3</button>
+    <button onclick="showTab('modes')">🍬 Match-3</button>
     <button onclick="showTab('bs')">🧪 Ball-Sort</button>
     <button onclick="showTab('roster')">👥 Roster</button>
     <button onclick="showTab('gal')">🖼️ Galerie</button>
@@ -178,11 +178,17 @@
     <p class="muted" style="margin-top:10px;">Geschenke nach Geschmack wirken stärker. 🪙 aus Minispielen. Nach 5 Story-Beats wird die nächste Person freigeschaltet.</p>
   </section>
 
+  <section id="tab-modes" class="card hidden">
+    <h2>Match-3 — Modus wählen</h2>
+    <div class="roster" id="modeGrid"></div>
+    <p class="muted">Alle Modi nutzen denselben Match-3-Kern — nur Ziele & Regeln (Daten) unterscheiden sich. (Story, Daily-Seed, Endlos, Time Attack)</p>
+  </section>
+
   <section id="tab-m3" class="card hidden">
-    <div class="hud"><div>Punkte: <b id="m3score">0</b> / <span id="m3target">800</span> · 🧊 <b id="m3ice">0</b> <span id="m3icetype" class="muted"></span></div><div>Züge: <b id="m3moves">20</b></div></div>
+    <div class="hud"><div id="m3left">Punkte: <b>0</b></div><div id="m3right">Züge: <b>20</b></div></div>
     <div id="m3mount" style="display:flex;justify-content:center;"></div>
-    <div class="btns"><button class="primary" onclick="startMatch3()">🔄 Neues Spiel</button><button onclick="showTab('hub')">Zurück</button></div>
-    <p class="muted">3+ gleiche Früchte tauschen. 4 in Reihe = Rakete 🚀, 5 = Farbbombe 💥. 🧊 Eis schmilzt durch Matches direkt daneben (mehrschichtig). Ziel + alles Eis räumen = 🪙.</p>
+    <div class="btns"><button class="primary" onclick="startMatch3()">🔄 Neu</button><button onclick="m3Finish()">🏁 Beenden</button><button onclick="showTab('modes')">Modi</button></div>
+    <p class="muted">3+ gleiche Früchte tauschen. 4 in Reihe = Rakete 🚀, 5 = Farbbombe 💥. 🧊 Eis schmilzt durch Matches daneben. Ziel + alles Eis räumen = 🪙.</p>
   </section>
 
   <section id="tab-bs" class="card hidden">

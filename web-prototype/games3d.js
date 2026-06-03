@@ -44,7 +44,26 @@ const M3 = {
   W: 8, H: 8, C: 6, cs: 1.18, grid: [], sel: null, score: 0, moves: 20, target: 800,
   busy: false, scene: null, cam: null, renderer: null, raycaster: null, mount: null,
   particles: [], shake: 0, camBase: new THREE.Vector3(0, -0.8, 12.2), iceLeft: 0,
+  mode: null, rng: Math.random, timed: 0, timeLeft: 0, lastT: 0, ended: false,
 };
+
+// --- Seedbarer RNG (Daily = reproduzierbares Board pro Tag) ---
+function mulberry32(a) {
+  return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function dateSeed() { const d = new Date(); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); }
+const rnd = () => (M3.rng || Math.random)();
+
+// --- Modi als DATEN (geteilter Kern, nur Ziele/Regeln unterscheiden sich) ---
+// Entspricht GameModeSO/IObjective/IRuleModifier aus docs/RESEARCH_MODES.md.
+const MODES = {
+  story:      { id: "story",      name: "Story",       icon: "📖", desc: "Ziele + Eis, Level-Progression", moves: 18, target: 700,  ice: true,  seeded: false, endless: false, timed: 0  },
+  daily:      { id: "daily",      name: "Daily",       icon: "📅", desc: "Täglich gleiches Board (Seed)",   moves: 25, target: 1000, ice: false, seeded: true,  endless: false, timed: 0  },
+  endless:    { id: "endless",    name: "Endlos",      icon: "♾️", desc: "Spielen bis keine Züge mehr",     moves: 0,  target: 0,    ice: false, seeded: false, endless: true,  timed: 0  },
+  timeattack: { id: "timeattack", name: "Time Attack", icon: "⏱️", desc: "60 Sek — maximale Punkte",        moves: 0,  target: 0,    ice: false, seeded: false, endless: true,  timed: 60 },
+};
+function startMode(id) { M3.mode = MODES[id] || MODES.story; showTab("m3"); }
 // Echte Frucht-Designs als Emoji-Textur (klar erkennbar, offline, voll farbig).
 const FRUIT = [
   { name: "apfel",        emoji: "🍎", color: 0xff4356 },
@@ -94,8 +113,13 @@ function makeSpecial(type, kind) {
 }
 
 function startMatch3() {
+  const mode = M3.mode || (M3.mode = MODES.story);
   const lvl = (state && state.m3level) || 1;
-  M3.score = 0; M3.moves = 18 + Math.min(8, lvl); M3.target = 700 + lvl * 120; M3.sel = null; M3.busy = false;
+  M3.rng = mode.seeded ? mulberry32(dateSeed()) : Math.random;
+  M3.score = 0; M3.sel = null; M3.busy = false; M3.ended = false;
+  M3.moves = mode.endless ? Infinity : (mode.moves + (mode.id === "story" ? Math.min(8, lvl) : 0));
+  M3.target = mode.endless ? Infinity : (mode.target + (mode.id === "story" ? lvl * 120 : 0));
+  M3.timed = mode.timed; M3.timeLeft = mode.timed; M3.lastT = performance.now();
   const mount = $("m3mount"); M3.mount = mount;
   const size = Math.min(440, (mount.clientWidth || 380));
   M3.scene = new T.Scene();
@@ -113,23 +137,24 @@ function startMatch3() {
   M3.grid = [];
   for (let y = 0; y < M3.H; y++) { M3.grid[y] = [];
     for (let x = 0; x < M3.W; x++) {
-      let c; do { c = (Math.random() * M3.C) | 0; }
+      let c; do { c = (rnd() * M3.C) | 0; }
       while ((x >= 2 && M3.grid[y][x-1].c === c && M3.grid[y][x-2].c === c) ||
              (y >= 2 && M3.grid[y-1][x].c === c && M3.grid[y-2][x].c === c));
       M3.grid[y][x] = newCell(c, x, y, true);
     } }
 
-  // Hindernis: Eis-Blocker säen. Stufe + Menge wachsen mit dem Level.
+  // Hindernis: Eis-Blocker säen (nur in Modi mit Eis). Stufe + Menge wachsen mit dem Level.
   M3.particles = []; M3.shake = 0; M3.iceLeft = 0;
-  const style = iceStyleForLevel(lvl);
-  M3.iceStyle = style;
-  const iceCount = Math.min(16, 3 + lvl * 2);
-  const spots = new Set();
-  for (let i = 0; i < iceCount; i++) {
-    const x = (Math.random() * M3.W) | 0, y = (Math.random() * M3.H) | 0, k = x + "," + y;
-    if (spots.has(k)) continue; spots.add(k);
-    const layers = 1 + ((Math.random() * style.maxLayers) | 0); // 1..maxLayers
-    setIce(M3.grid[y][x], layers, style); M3.iceLeft++;
+  const style = iceStyleForLevel(lvl); M3.iceStyle = style;
+  if (mode.ice) {
+    const iceCount = Math.min(16, 3 + lvl * 2);
+    const spots = new Set();
+    for (let i = 0; i < iceCount; i++) {
+      const x = (rnd() * M3.W) | 0, y = (rnd() * M3.H) | 0, k = x + "," + y;
+      if (spots.has(k)) continue; spots.add(k);
+      const layers = 1 + ((rnd() * style.maxLayers) | 0); // 1..maxLayers
+      setIce(M3.grid[y][x], layers, style); M3.iceLeft++;
+    }
   }
 
   M3.renderer.domElement.style.cursor = "pointer";
@@ -264,6 +289,11 @@ function iceShatter(x, y, style) {
 function tickM3() {
   if (!M3.renderer) return;
   const now = performance.now() / 1000;
+  if (M3.timed && !M3.ended) {                         // Time-Attack-Timer
+    const tn = performance.now(), dt = (tn - (M3.lastT || tn)) / 1000; M3.lastT = tn;
+    if (!M3.busy) { M3.timeLeft -= dt; if (M3.timeLeft <= 0) { M3.timeLeft = 0; updateM3Hud(); endMode(true); } }
+    M3._hud = (M3._hud || 0) + dt; if (M3._hud > 0.25) { M3._hud = 0; updateM3Hud(); }
+  }
   M3.scene.traverse(o => {
     if (o.isGroup && o.userData && o.userData.body) {
       const u = o.userData;
@@ -339,12 +369,60 @@ async function doSwap(a, b) {
   M3.busy = true;
   swapCells(a, b);
   await wait(180);
-  if (await resolveBoard(b)) { M3.moves--; beep(620, .07); }
+  if (await resolveBoard(b)) { if (M3.moves !== Infinity) M3.moves--; beep(620, .07); }
   else { swapCells(a, b); beep(200, .08, "square"); await wait(160); }
+  const playable = ensurePlayable();
   updateM3Hud();
   M3.busy = false;
-  if (M3.score >= M3.target && M3.iceLeft <= 0) endM3(true);
-  else if (M3.moves <= 0) endM3(false);
+  const mode = M3.mode;
+  if (!mode.endless && M3.score >= M3.target && M3.iceLeft <= 0) endMode(true);
+  else if (!mode.endless && M3.moves <= 0) endMode(false);
+  else if (mode.endless && !mode.timed && !playable) endMode(true);  // Endlos: stuck -> auszahlen
+}
+
+// Solvability (aus der Architektur-Recherche): gibt es ≥1 gültigen Zug? Sonst neu mischen.
+function hasValidMove() {
+  for (let y = 0; y < M3.H; y++) for (let x = 0; x < M3.W; x++) {
+    if (cAt(x, y) < 0) continue;
+    for (const [dx, dy] of [[1, 0], [0, 1]]) {
+      const nx = x + dx, ny = y + dy; if (nx >= M3.W || ny >= M3.H || cAt(nx, ny) < 0) continue;
+      const t = M3.grid[y][x]; M3.grid[y][x] = M3.grid[ny][nx]; M3.grid[ny][nx] = t;  // probeweise tauschen
+      const ok = runs().length > 0;
+      const t2 = M3.grid[y][x]; M3.grid[y][x] = M3.grid[ny][nx]; M3.grid[ny][nx] = t2; // zurück
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+function setFruitType(cell, type) {
+  cell.c = type; const b = cell.mesh.userData.body;
+  b.material.map = emojiTexture(FRUIT[type].emoji); b.material.needsUpdate = true;
+}
+function reshuffle() {
+  const cells = [];
+  for (let y = 0; y < M3.H; y++) for (let x = 0; x < M3.W; x++) { const c = M3.grid[y][x]; if (c && c.ice <= 0 && !c.s) cells.push(c); }
+  for (let tries = 0; tries < 25; tries++) {
+    cells.forEach(c => setFruitType(c, (rnd() * M3.C) | 0));
+    if (runs().length === 0 && hasValidMove()) return true;
+  }
+  return hasValidMove();
+}
+function ensurePlayable() {
+  if (hasValidMove()) return true;
+  beep(300, .1); toast("🔀 Keine Züge — neu gemischt");
+  return reshuffle();
+}
+
+function endMode(won) {
+  if (M3.ended) return; M3.ended = true; M3.busy = true;
+  const mode = M3.mode;
+  if (won) {
+    if (mode.id === "story") state.m3level = (state.m3level || 1) + 1;
+    if (mode.id === "daily") { state.dailyDone = dateSeed(); state.dailyBest = Math.max(state.dailyBest || 0, M3.score); }
+    if (mode.endless) state.endlessBest = Math.max(state.endlessBest || 0, M3.score);
+    const reward = Math.max(10, Math.floor(M3.score / 7));
+    beep(990, .2); minigameFinished(reward);
+  } else { toast("Geschafft? Nicht ganz — probier's nochmal."); }
 }
 function swapCells(a, b) {
   const ca = M3.grid[a.y][a.x], cb = M3.grid[b.y][b.x];
@@ -453,22 +531,18 @@ function gravity() {
     for (let y = M3.H - 1; y >= 0; y--) if (M3.grid[y][x]) stack.push(M3.grid[y][x]);
     let y = M3.H - 1;
     for (const cell of stack) { M3.grid[y][x] = cell; setTarget(cell, x, y); y--; }
-    for (; y >= 0; y--) M3.grid[y][x] = newCell((Math.random() * M3.C) | 0, x, y, true);
+    for (; y >= 0; y--) M3.grid[y][x] = newCell((rnd() * M3.C) | 0, x, y, true);
   }
 }
 function updateM3Hud() {
-  $("m3score").textContent = M3.score; $("m3moves").textContent = M3.moves;
-  $("m3target").textContent = M3.target; $("m3ice").textContent = M3.iceLeft;
-  $("m3icetype").textContent = (M3.iceLeft > 0 && M3.iceStyle) ? "(" + M3.iceStyle.label + ")" : "";
+  const mode = M3.mode || MODES.story;
+  let left = `Punkte: <b>${M3.score}</b>`;
+  if (M3.target !== Infinity) left += ` / ${M3.target}`;
+  if (mode.ice) left += ` · 🧊 <b>${M3.iceLeft}</b>` + (M3.iceLeft > 0 && M3.iceStyle ? ` <span class="muted">(${M3.iceStyle.label})</span>` : "");
+  $("m3left").innerHTML = left;
+  $("m3right").innerHTML = M3.timed ? `⏱️ <b>${Math.ceil(M3.timeLeft)}s</b>` : `Züge: <b>${M3.moves === Infinity ? "∞" : M3.moves}</b>`;
 }
-function endM3(won) {
-  M3.busy = true;
-  if (won) {
-    state.m3level = ((state.m3level || 1) + 1);
-    const reward = Math.floor(M3.score / 7);
-    beep(990, .2); minigameFinished(reward);
-  } else { toast("Keine Züge mehr — probier's nochmal."); }
-}
+function m3Finish() { endMode(M3.mode && M3.mode.endless ? true : false); }
 
 // =====================================================================
 //  BALL-SORT (3D, Glas-Reagenzgläser)
@@ -601,6 +675,10 @@ function endBS() {
 
 // Globals exportieren (Buttons in index.html)
 window.startMatch3 = startMatch3;
+window.startMode = startMode;
+window.m3Finish = m3Finish;
+window.M3MODES = MODES;
+window.dateSeedVal = dateSeed;
 window.startBallSort = startBallSort;
 window.bsUndo = bsUndo;
 })();
